@@ -3,9 +3,10 @@ package mediakit
 import (
 	"bytes"
 	"fmt"
-	"github.com/neptune-media/MediaKit-go/ffprobe"
 	"io"
 	"os/exec"
+
+	"github.com/neptune-media/MediaKit-go/ffprobe"
 )
 
 type FrameNumber int
@@ -18,7 +19,7 @@ func ReadVideoIFrames(filename string) ([]FrameNumber, error) {
 		"v",
 		"-show_frames",
 		"-of",
-		"json",
+		"json=compact=1",
 		filename,
 	)
 
