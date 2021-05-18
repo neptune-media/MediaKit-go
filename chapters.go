@@ -2,6 +2,7 @@ package mediakit
 
 import (
 	"github.com/pixelbender/go-matroska/matroska"
+	"time"
 )
 
 type Chapter struct {
@@ -33,4 +34,8 @@ func ReadVideoChapters(filename string) ([]Chapter, error) {
 	}
 
 	return chapters, nil
+}
+
+func (c Chapter) Runtime() time.Duration {
+	return time.Duration(c.TimeEnd-c.TimeStart) * time.Millisecond
 }

@@ -37,7 +37,7 @@ var chaptersCmd = &cobra.Command{
 						i,
 						chapter.TimeStart,
 						chapter.TimeEnd,
-						float64(chapter.TimeEnd-chapter.TimeStart)/1000.0,
+						chapter.Runtime().Seconds(),
 					)
 				}
 			}
