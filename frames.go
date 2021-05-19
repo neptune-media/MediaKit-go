@@ -10,6 +10,11 @@ import (
 	"github.com/neptune-media/MediaKit-go/ffprobe"
 )
 
+type FrameSeeker struct {
+	Frames []time.Duration
+	pos    int
+}
+
 func ReadVideoIFrames(filename string) ([]time.Duration, error) {
 	frames := make([]time.Duration, 0)
 
@@ -57,4 +62,30 @@ func ReadVideoIFrames(filename string) ([]time.Duration, error) {
 	}
 
 	return frames, nil
+}
+
+func (f *FrameSeeker) Current() time.Duration {
+	return f.Frames[f.pos]
+}
+
+func (f *FrameSeeker) AtEnd() bool {
+	return !(f.pos < len(f.Frames))
+}
+
+func (f *FrameSeeker) Next() {
+	if !f.AtEnd() {
+		f.pos += 1
+	}
+}
+
+func (f *FrameSeeker) Peek() time.Duration {
+	if f.pos+1 < len(f.Frames) {
+		return f.Frames[f.pos+1]
+	}
+
+	return f.Frames[f.pos]
+}
+
+func (f *FrameSeeker) Reset() {
+	f.pos = 0
 }

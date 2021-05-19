@@ -1,6 +1,8 @@
 package mediakit
 
-import "time"
+import (
+	"time"
+)
 
 type Episode struct {
 	Chapters []Chapter
@@ -10,6 +12,9 @@ type Episode struct {
 type EpisodeBuilderOptions struct {
 	// Last added chapter must exceed this to continue adding chapters
 	EndingChapterTime time.Duration
+
+	// Used to align chapters to frames, when provided
+	FrameSeeker *FrameSeeker
 
 	// Skips check on EndingChapterTime
 	IgnoreMissingEnd bool
@@ -30,6 +35,10 @@ func ReadVideoEpisodes(filename string, opts EpisodeBuilderOptions) ([]Episode, 
 		return nil, err
 	}
 
+	if opts.FrameSeeker != nil {
+		AlignChaptersToIFrames(chapters, opts.FrameSeeker)
+	}
+
 	episode := Episode{}
 	for _, chapter := range chapters {
 		episode.Chapters = append(episode.Chapters, chapter)
@@ -44,6 +53,7 @@ func ReadVideoEpisodes(filename string, opts EpisodeBuilderOptions) ([]Episode, 
 			continue
 		}
 
+		// Discard the episode if the runtime doesn't meet the minimum length
 		if episode.Runtime() < opts.MinimumEpisodeLength {
 			episode.Discard = true
 		}
@@ -53,6 +63,41 @@ func ReadVideoEpisodes(filename string, opts EpisodeBuilderOptions) ([]Episode, 
 	}
 
 	return episodes, nil
+}
+
+func AlignChaptersToIFrames(chapters []Chapter, seeker *FrameSeeker) {
+	for chIndex, chapter := range chapters {
+		for {
+			// Stop seeking if at the end
+			if seeker.AtEnd() {
+				break
+			}
+
+			// Seek until the next frame is after the chapter start time
+			if seeker.Peek() < chapter.StartTime() {
+				seeker.Next()
+				continue
+			}
+
+			// Update start time to current frame
+			newStartTime := seeker.Current()
+			//fmt.Printf("Updating chapter %d start time from %.1f to %.1f\n", chIndex, chapter.StartTime().Seconds(), newStartTime.Seconds())
+			chapter.TimeStart = int64(newStartTime / time.Millisecond)
+
+			// If this is not the first chapter
+			if chIndex > 0 {
+				prevChapter := chapters[chIndex-1]
+
+				// Check if the previous chapter ends after this chapter starts
+				// and adjust the previous end time to the new start time
+				if prevChapter.TimeEnd > chapter.TimeStart {
+					//fmt.Printf("Updating chapter %d end time from %.1f to %.1f\n", chIndex-1, prevChapter.EndTime().Seconds(), newStartTime.Seconds())
+					prevChapter.TimeEnd = chapter.TimeStart
+				}
+			}
+			break
+		}
+	}
 }
 
 func (e Episode) Runtime() time.Duration {

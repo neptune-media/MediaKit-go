@@ -37,5 +37,13 @@ func ReadVideoChapters(filename string) ([]Chapter, error) {
 }
 
 func (c Chapter) Runtime() time.Duration {
-	return time.Duration(c.TimeEnd-c.TimeStart) * time.Millisecond
+	return c.EndTime() - c.StartTime()
+}
+
+func (c Chapter) EndTime() time.Duration {
+	return time.Duration(c.TimeEnd) * time.Millisecond
+}
+
+func (c Chapter) StartTime() time.Duration {
+	return time.Duration(c.TimeStart) * time.Millisecond
 }
