@@ -22,7 +22,7 @@ var iframesCmd = &cobra.Command{
 			return
 		} else {
 			for _, frame := range frames {
-				fmt.Fprintf(os.Stdout, "%d\n", frame)
+				fmt.Fprintf(os.Stdout, "%.03f s\n", frame.Seconds())
 			}
 		}
 	},

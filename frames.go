@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"time"
 
 	"github.com/neptune-media/MediaKit-go/ffprobe"
 )
 
-type FrameNumber int
-
-func ReadVideoIFrames(filename string) ([]FrameNumber, error) {
-	frames := make([]FrameNumber, 0)
+func ReadVideoIFrames(filename string) ([]time.Duration, error) {
+	frames := make([]time.Duration, 0)
 
 	c := exec.Command("ffprobe",
 		"-select_streams",
@@ -53,7 +52,7 @@ func ReadVideoIFrames(filename string) ([]FrameNumber, error) {
 
 	for _, frame := range parsed.Frames {
 		if frame.PictType == "I" {
-			frames = append(frames, FrameNumber(frame.PktPTS))
+			frames = append(frames, time.Duration(frame.PktPTS)*time.Millisecond)
 		}
 	}
 
