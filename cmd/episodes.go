@@ -28,6 +28,11 @@ var episodesCmd = &cobra.Command{
 			fmt.Printf("error while reading flag: %v\n", err)
 			return
 		}
+		iframesFilename, err := cmd.Flags().GetString("iframes")
+		if err != nil {
+			fmt.Printf("error while reading flag: %v\n", err)
+			return
+		}
 
 		opts := mediakit.EpisodeBuilderOptions{
 			EndingChapterTime:    60 * time.Second,
@@ -36,10 +41,25 @@ var episodesCmd = &cobra.Command{
 		}
 
 		if alignChapters {
-			frames, err := mediakit.ReadVideoIFrames(inputFilename)
-			if err != nil {
-				fmt.Printf("error while reading IFrames: %+v\n", err)
-				return
+			var frames []time.Duration
+			if iframesFilename != "" {
+				fmt.Printf("iframes file: %s\n", iframesFilename)
+				iframesFile, err := os.Open(iframesFilename)
+				if err != nil {
+					fmt.Printf("error while reading IFrames: %+v\n", err)
+					return
+				}
+				frames, err = mediakit.ReadFrameArray(iframesFile)
+				if err != nil {
+					fmt.Printf("error while reading IFrames: %+v\n", err)
+					return
+				}
+			} else {
+				frames, err = mediakit.ReadVideoIFrames(inputFilename)
+				if err != nil {
+					fmt.Printf("error while reading IFrames: %+v\n", err)
+					return
+				}
 			}
 			opts.FrameSeeker = &mediakit.FrameSeeker{Frames: frames}
 		}
@@ -97,4 +117,5 @@ func init() {
 	// episodesCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	episodesCmd.Flags().BoolP("align-chapters", "", false, "Align chapter markers to iframes")
 	episodesCmd.Flags().BoolP("print-mkv-command", "", false, "Print mkvmerge commands to split file")
+	episodesCmd.Flags().String("iframes", "", "Path to a file containing IFrame data for the video file")
 }
