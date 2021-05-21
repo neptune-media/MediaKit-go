@@ -15,6 +15,8 @@ type FrameSeeker struct {
 	pos    int
 }
 
+type FrameArray []time.Duration
+
 func ReadVideoIFrames(filename string) ([]time.Duration, error) {
 	frames := make([]time.Duration, 0)
 
@@ -62,6 +64,32 @@ func ReadVideoIFrames(filename string) ([]time.Duration, error) {
 	}
 
 	return frames, nil
+}
+
+func ReadFrameArray(r io.Reader) ([]time.Duration, error) {
+	frames := make([]time.Duration, 0)
+	for {
+		var t time.Duration
+		if _, err := fmt.Fscanf(r, "%d\n", &t); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		frames = append(frames, t)
+	}
+
+	return frames, nil
+}
+
+func (a FrameArray) Write(w io.Writer) error {
+	for _, frame := range []time.Duration(a) {
+		if _, err := fmt.Fprintf(w, "%d\n", frame); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (f *FrameSeeker) Current() time.Duration {
