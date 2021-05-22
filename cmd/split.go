@@ -4,6 +4,7 @@ import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
 	"github.com/neptune-media/MediaKit-go/mkvmerge"
+	"github.com/neptune-media/MediaKit-go/mkvpropedit"
 	"log"
 	"os"
 	"time"
@@ -69,6 +70,7 @@ var splitCmd = &cobra.Command{
 			fmt.Printf("error while reading episodes: %+v\n", err)
 			return
 		}
+		fmt.Printf("Built %d episodes\n", len(episodes))
 
 		runner := mkvmerge.NewSplitter(
 			inputFilename,
@@ -86,18 +88,10 @@ var splitCmd = &cobra.Command{
 				return
 			}
 
-			fmt.Printf("Correcting episode chapter names")
-			for i, episode := range episodes {
-				f, err := os.Create(fmt.Sprintf("output-%03d.mkv.chapters", i))
-				if err != nil {
-					fmt.Printf("error while writing chapters: %v\n", err)
-					return
-				}
-				if _, err := mediakit.ChapterArray(episode.Chapters).WriteTo(f); err != nil {
-					fmt.Printf("error while writing chapters: %v\n", err)
-					return
-				}
-				f.Close()
+			fmt.Printf("Correcting episode chapter names\n")
+			if err := mkvpropedit.FixEpisodeChapterNames(episodes, "output.mkv"); err != nil {
+				fmt.Printf("error while writing chapters: %v\n", err)
+				return
 			}
 		}
 	},
