@@ -51,14 +51,17 @@ func ReadFrameArray(r io.Reader) ([]time.Duration, error) {
 	return frames, nil
 }
 
-func (a FrameArray) Write(w io.Writer) error {
+func (a FrameArray) WriteTo(w io.Writer) (int64, error) {
+	var n int64 = 0
 	for _, frame := range []time.Duration(a) {
-		if _, err := fmt.Fprintf(w, "%d\n", frame); err != nil {
-			return err
+		count, err := fmt.Fprintf(w, "%d\n", frame)
+		n += int64(count)
+		if err != nil {
+			return n, err
 		}
 	}
 
-	return nil
+	return n, nil
 }
 
 func (f *FrameSeeker) Current() time.Duration {

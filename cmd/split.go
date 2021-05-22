@@ -63,13 +63,14 @@ var splitCmd = &cobra.Command{
 		log.SetOutput(new(Sink))
 
 		// Build episodes from file
+		fmt.Printf("Building episodes from file\n")
 		episodes, err := mediakit.ReadVideoEpisodes(inputFilename, opts)
 		if err != nil {
 			fmt.Printf("error while reading episodes: %+v\n", err)
 			return
 		}
 
-		runner := mkvmerge.NewSplitRunner(
+		runner := mkvmerge.NewSplitter(
 			inputFilename,
 			"output.mkv",
 			episodes,
@@ -83,6 +84,20 @@ var splitCmd = &cobra.Command{
 				fmt.Printf("error while splitting file: %v\n", err)
 				fmt.Printf("output from command:\n%s\n", runner.Output())
 				return
+			}
+
+			fmt.Printf("Correcting episode chapter names")
+			for i, episode := range episodes {
+				f, err := os.Create(fmt.Sprintf("output-%03d.mkv.chapters", i))
+				if err != nil {
+					fmt.Printf("error while writing chapters: %v\n", err)
+					return
+				}
+				if _, err := mediakit.ChapterArray(episode.Chapters).WriteTo(f); err != nil {
+					fmt.Printf("error while writing chapters: %v\n", err)
+					return
+				}
+				f.Close()
 			}
 		}
 	},

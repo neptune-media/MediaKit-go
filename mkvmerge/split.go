@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func NewSplitRunner(input, output string, episodes []mediakit.Episode) *Runner {
+func NewSplitter(input, output string, episodes []mediakit.Episode) *Runner {
 
 	// Generate split part list
 	splitPartList := make([]string, len(episodes))

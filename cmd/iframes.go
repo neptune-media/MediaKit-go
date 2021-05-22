@@ -41,7 +41,7 @@ var iframesCmd = &cobra.Command{
 				}
 				defer f.Close()
 
-				if err := mediakit.FrameArray(frames).Write(f); err != nil {
+				if _, err := mediakit.FrameArray(frames).WriteTo(f); err != nil {
 					fmt.Printf("error while saving IFrames: %v\n", err)
 					return
 				}
