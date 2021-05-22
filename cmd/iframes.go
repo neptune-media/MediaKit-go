@@ -4,6 +4,7 @@ import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -25,10 +26,13 @@ var iframesCmd = &cobra.Command{
 			fmt.Printf("Saving iframes to %s\n", saveFilename)
 		}
 
+		startTime := time.Now()
 		if frames, err := mediakit.ReadVideoIFrames(inputFilename); err != nil {
 			fmt.Printf("error while reading IFrames: %+v\n", err)
 			return
 		} else {
+			readTime := time.Now().Sub(startTime)
+			fmt.Printf("Took %s to analyze file\n", readTime.String())
 			if saveFilename != "" {
 				f, err := os.Create(saveFilename)
 				if err != nil {
@@ -41,9 +45,10 @@ var iframesCmd = &cobra.Command{
 					fmt.Printf("error while saving IFrames: %v\n", err)
 					return
 				}
-			}
-			for _, frame := range frames {
-				fmt.Fprintf(os.Stdout, "%.03f s\n", frame.Seconds())
+			} else {
+				for _, frame := range frames {
+					fmt.Fprintf(os.Stdout, "%.03f s\n", frame.Seconds())
+				}
 			}
 		}
 	},
