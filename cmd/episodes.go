@@ -45,21 +45,9 @@ var episodesCmd = &cobra.Command{
 
 		if alignChapters {
 			var frames []time.Duration
-			if iframesFilename != "" {
-				fmt.Printf("iframes file: %s\n", iframesFilename)
-				iframesFile, err := os.Open(iframesFilename)
-				if err != nil {
-					return fmt.Errorf("error while reading IFrames: %v", err)
-				}
-				frames, err = mediakit.ReadFrameArray(iframesFile)
-				if err != nil {
-					return fmt.Errorf("error while reading IFrames: %v", err)
-				}
-			} else {
-				frames, err = tasks.ReadVideoIFrames(inputFilename)
-				if err != nil {
-					return fmt.Errorf("error while reading IFrames: %v", err)
-				}
+			frames, err = loadIFrames(inputFilename, iframesFilename)
+			if err != nil {
+				return fmt.Errorf("error while reading IFrames: %v", err)
 			}
 			opts.FrameSeeker = &mediakit.FrameSeeker{Frames: frames}
 		}
@@ -101,4 +89,19 @@ func init() {
 	// episodesCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	episodesCmd.Flags().BoolP("align-chapters", "", false, "Align chapter markers to iframes")
 	episodesCmd.Flags().String("iframes", "", "Path to a file containing IFrame data for the video file")
+}
+
+func loadIFrames(sourceFilename, iframesFilename string) ([]time.Duration, error) {
+	if iframesFilename == "" {
+		return tasks.ReadVideoIFrames(sourceFilename)
+	}
+
+	fmt.Printf("iframes file: %s\n", iframesFilename)
+	f, err := os.Open(iframesFilename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return mediakit.ReadFrameArray(f)
 }

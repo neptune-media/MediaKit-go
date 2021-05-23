@@ -51,21 +51,9 @@ var splitCmd = &cobra.Command{
 		}
 
 		var frames []time.Duration
-		if iframesFilename != "" {
-			fmt.Printf("iframes file: %s\n", iframesFilename)
-			iframesFile, err := os.Open(iframesFilename)
-			if err != nil {
-				return fmt.Errorf("error while reading IFrames: %v", err)
-			}
-			frames, err = mediakit.ReadFrameArray(iframesFile)
-			if err != nil {
-				return fmt.Errorf("error while reading IFrames: %v", err)
-			}
-		} else {
-			frames, err = tasks.ReadVideoIFrames(inputFilename)
-			if err != nil {
-				return fmt.Errorf("error while reading IFrames: %v", err)
-			}
+		frames, err = loadIFrames(inputFilename, iframesFilename)
+		if err != nil {
+			return fmt.Errorf("error while reading IFrames: %v", err)
 		}
 		opts.FrameSeeker = &mediakit.FrameSeeker{Frames: frames}
 
