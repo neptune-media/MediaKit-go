@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
-	"github.com/neptune-media/MediaKit-go/mkvmerge"
-	"github.com/neptune-media/MediaKit-go/mkvpropedit"
+	"github.com/neptune-media/MediaKit-go/tools/mkvmerge"
+	"github.com/neptune-media/MediaKit-go/tools/mkvpropedit"
 	"log"
 	"os"
 	"time"
@@ -84,7 +84,7 @@ var splitCmd = &cobra.Command{
 			fmt.Printf("Splitting file into multiple episodes\n")
 			if err := runner.Do(); err != nil {
 				fmt.Printf("error while splitting file: %v\n", err)
-				fmt.Printf("output from command:\n%s\n", runner.Output())
+				fmt.Printf("output from command:\n%s\n", runner.GetOutput())
 				return
 			}
 

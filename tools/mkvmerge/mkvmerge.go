@@ -29,7 +29,7 @@ func (r *Runner) GetCommandString() string {
 	return strings.Join(cmd, " ")
 }
 
-func (r *Runner) Output() []byte {
+func (r *Runner) GetOutput() []byte {
 	o := make([]byte, len(r.output))
 	copy(o, r.output)
 	return o

@@ -2,9 +2,8 @@ package mediakit
 
 import (
 	"fmt"
+	"github.com/neptune-media/MediaKit-go/tools/ffprobe"
 	"time"
-
-	"github.com/neptune-media/MediaKit-go/ffprobe"
 )
 
 func ReadVideoIFrames(filename string) ([]time.Duration, error) {

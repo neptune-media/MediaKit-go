@@ -3,9 +3,10 @@ package mkvpropedit
 import (
 	"fmt"
 	"github.com/neptune-media/MediaKit-go"
-	"github.com/neptune-media/MediaKit-go/mkvmerge"
+	"github.com/neptune-media/MediaKit-go/tools/mkvmerge"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 type Runner struct {
@@ -16,12 +17,7 @@ type Runner struct {
 }
 
 func (r *Runner) Do() error {
-	c := exec.Command(
-		"mkvpropedit",
-		r.Filename,
-		"-c",
-		r.ChaptersFilename,
-	)
+	c := exec.Command("mkvpropedit", r.buildArgs()...)
 	o, err := c.CombinedOutput()
 
 	r.output = make([]byte, len(o))
@@ -29,10 +25,24 @@ func (r *Runner) Do() error {
 	return err
 }
 
-func (r *Runner) Output() []byte {
+func (r *Runner) GetCommandString() string {
+	cmd := []string{"mkvpropedit"}
+	cmd = append(cmd, r.buildArgs()...)
+	return strings.Join(cmd, " ")
+}
+
+func (r *Runner) GetOutput() []byte {
 	o := make([]byte, len(r.output))
 	copy(o, r.output)
 	return o
+}
+
+func (r *Runner) buildArgs() []string {
+	return []string{
+		r.Filename,
+		"-c",
+		r.ChaptersFilename,
+	}
 }
 
 func FixEpisodeChapterNames(episodes []mediakit.Episode, filename string) error {
@@ -50,7 +60,7 @@ func FixEpisodeChapterNames(episodes []mediakit.Episode, filename string) error 
 		}
 		if err := runner.Do(); err != nil {
 			fmt.Printf("error while updating file: %v\n", err)
-			fmt.Printf("output from command:\n%s\n", runner.Output())
+			fmt.Printf("output from command:\n%s\n", runner.GetOutput())
 			return err
 		}
 
