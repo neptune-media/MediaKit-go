@@ -4,6 +4,8 @@ import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
 	"github.com/neptune-media/MediaKit-go/tasks"
+	"github.com/neptune-media/MediaKit-go/tools"
+	"github.com/neptune-media/MediaKit-go/tools/ffprobe"
 	"github.com/neptune-media/MediaKit-go/tools/mkvmerge"
 	"github.com/neptune-media/MediaKit-go/tools/mkvpropedit"
 	"log"
@@ -18,19 +20,28 @@ var splitCmd = &cobra.Command{
 	Use:   "split [file]",
 	Short: "Splits a multi-episode file into multiple files",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := tools.NewChecks(
+			ffprobe.NewCheck(),
+			mkvmerge.NewCheck(),
+			mkvpropedit.NewCheck(),
+		).Run(); err != nil {
+			return fmt.Errorf("pre-flight checks failed: %v", err)
+		}
+
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		inputFilename := args[0]
 		fmt.Printf("source file: %s\n", inputFilename)
 		printCommands, err := cmd.Flags().GetBool("print")
 		if err != nil {
-			fmt.Printf("error while reading flag: %v\n", err)
-			return
+			return fmt.Errorf("error while reading flag: %v", err)
 		}
 
 		iframesFilename, err := cmd.Flags().GetString("iframes")
 		if err != nil {
-			fmt.Printf("error while reading flag: %v\n", err)
-			return
+			return fmt.Errorf("error while reading flag: %v", err)
 		}
 
 		opts := mediakit.EpisodeBuilderOptions{
@@ -44,19 +55,16 @@ var splitCmd = &cobra.Command{
 			fmt.Printf("iframes file: %s\n", iframesFilename)
 			iframesFile, err := os.Open(iframesFilename)
 			if err != nil {
-				fmt.Printf("error while reading IFrames: %+v\n", err)
-				return
+				return fmt.Errorf("error while reading IFrames: %v", err)
 			}
 			frames, err = mediakit.ReadFrameArray(iframesFile)
 			if err != nil {
-				fmt.Printf("error while reading IFrames: %+v\n", err)
-				return
+				return fmt.Errorf("error while reading IFrames: %v", err)
 			}
 		} else {
 			frames, err = tasks.ReadVideoIFrames(inputFilename)
 			if err != nil {
-				fmt.Printf("error while reading IFrames: %+v\n", err)
-				return
+				return fmt.Errorf("error while reading IFrames: %v", err)
 			}
 		}
 		opts.FrameSeeker = &mediakit.FrameSeeker{Frames: frames}
@@ -68,8 +76,7 @@ var splitCmd = &cobra.Command{
 		fmt.Printf("Building episodes from file\n")
 		episodes, err := tasks.ReadVideoEpisodes(inputFilename, opts)
 		if err != nil {
-			fmt.Printf("error while reading episodes: %+v\n", err)
-			return
+			return fmt.Errorf("error while reading episodes: %v", err)
 		}
 		fmt.Printf("Built %d episodes\n", len(episodes))
 
@@ -84,17 +91,16 @@ var splitCmd = &cobra.Command{
 		} else {
 			fmt.Printf("Splitting file into multiple episodes\n")
 			if err := runner.Do(); err != nil {
-				fmt.Printf("error while splitting file: %v\n", err)
-				fmt.Printf("output from command:\n%s\n", runner.GetOutput())
-				return
+				return fmt.Errorf("error while splitting file: %v\noutput from command:\n%s", err, runner.GetOutput())
 			}
 
 			fmt.Printf("Correcting episode chapter names\n")
 			if err := mkvpropedit.FixEpisodeChapterNames(episodes, "output.mkv"); err != nil {
-				fmt.Printf("error while writing chapters: %v\n", err)
-				return
+				return fmt.Errorf("error while writing chapters: %v", err)
 			}
 		}
+
+		return nil
 	},
 }
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
 	"github.com/neptune-media/MediaKit-go/tasks"
+	"github.com/neptune-media/MediaKit-go/tools"
+	"github.com/neptune-media/MediaKit-go/tools/ffprobe"
 	"os"
 	"time"
 
@@ -15,12 +17,19 @@ var iframesCmd = &cobra.Command{
 	Use:   "iframes [file]",
 	Short: "Prints a list of frame numbers of I-frames in the given file",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := tools.NewChecks(ffprobe.NewCheck()).Run(); err != nil {
+			return fmt.Errorf("pre-flight checks failed: %v", err)
+		}
+
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		inputFilename := args[0]
 		saveFilename, err := cmd.Flags().GetString("save")
 		if err != nil {
-			fmt.Printf("error while reading flag: %v\n", err)
-			return
+			return fmt.Errorf("error while reading flag: %v", err)
+
 		}
 		fmt.Printf("Dumping iframes for %s\n", inputFilename)
 		if saveFilename != "" {
@@ -29,22 +38,19 @@ var iframesCmd = &cobra.Command{
 
 		startTime := time.Now()
 		if frames, err := tasks.ReadVideoIFrames(inputFilename); err != nil {
-			fmt.Printf("error while reading IFrames: %+v\n", err)
-			return
+			return fmt.Errorf("error while reading IFrames: %v", err)
 		} else {
 			readTime := time.Now().Sub(startTime)
 			fmt.Printf("Took %s to analyze file\n", readTime.String())
 			if saveFilename != "" {
 				f, err := os.Create(saveFilename)
 				if err != nil {
-					fmt.Printf("error while saving IFrames: %v\n", err)
-					return
+					return fmt.Errorf("error while saving IFrames: %v", err)
 				}
 				defer f.Close()
 
 				if _, err := mediakit.FrameArray(frames).WriteTo(f); err != nil {
-					fmt.Printf("error while saving IFrames: %v\n", err)
-					return
+					return fmt.Errorf("error while saving IFrames: %v", err)
 				}
 			} else {
 				for _, frame := range frames {
@@ -52,6 +58,8 @@ var iframesCmd = &cobra.Command{
 				}
 			}
 		}
+
+		return nil
 	},
 }
 

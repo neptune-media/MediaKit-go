@@ -20,15 +20,14 @@ var chaptersCmd = &cobra.Command{
 	Use:   "chapters [file]",
 	Short: "Prints a list of chapters in a given file",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		inputFilename := args[0]
 		fmt.Printf("Dumping chapters for %s\n", inputFilename)
 
 		// matroska-go outputs every block and is super noisy
 		log.SetOutput(new(Sink))
 		if chapters, err := tasks.ReadVideoChapters(inputFilename); err != nil {
-			fmt.Printf("error while reading chapters: %+v\n", err)
-			return
+			return fmt.Errorf("error while reading chapters: %v", err)
 		} else {
 			for i, chapter := range chapters {
 				if chapter.Enabled {
@@ -42,6 +41,8 @@ var chaptersCmd = &cobra.Command{
 				}
 			}
 		}
+
+		return nil
 	},
 }
 
