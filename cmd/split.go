@@ -44,11 +44,7 @@ var splitCmd = &cobra.Command{
 			return fmt.Errorf("error while reading flag: %v", err)
 		}
 
-		opts := mediakit.EpisodeBuilderOptions{
-			EndingChapterTime:    60 * time.Second,
-			MinimumChapters:      2,
-			MinimumEpisodeLength: 20 * time.Minute,
-		}
+		opts := newEpisodeBuilderOptionsFromFlags(cmd)
 
 		var frames []time.Duration
 		frames, err = loadIFrames(inputFilename, iframesFilename)
@@ -106,4 +102,5 @@ func init() {
 	// splitCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	splitCmd.Flags().String("iframes", "", "Path to a file containing IFrame data for the video file")
 	splitCmd.Flags().BoolP("print", "", false, "Print mkvmerge commands instead of running")
+	addEpisodeBuilderFlags(splitCmd)
 }

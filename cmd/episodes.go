@@ -37,11 +37,7 @@ var episodesCmd = &cobra.Command{
 			return fmt.Errorf("error while reading flag: %v", err)
 		}
 
-		opts := mediakit.EpisodeBuilderOptions{
-			EndingChapterTime:    60 * time.Second,
-			MinimumChapters:      2,
-			MinimumEpisodeLength: 20 * time.Minute,
-		}
+		opts := newEpisodeBuilderOptionsFromFlags(cmd)
 
 		if alignChapters {
 			var frames []time.Duration
@@ -89,6 +85,24 @@ func init() {
 	// episodesCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	episodesCmd.Flags().BoolP("align-chapters", "", false, "Align chapter markers to iframes")
 	episodesCmd.Flags().String("iframes", "", "Path to a file containing IFrame data for the video file")
+	addEpisodeBuilderFlags(episodesCmd)
+}
+
+func addEpisodeBuilderFlags(cmd *cobra.Command) {
+	cmd.Flags().Duration("ending-chapter-time", 60, "Chapters longer than this will continue the episode")
+	cmd.Flags().Int("minimum-chapters", 2, "Minimum number of chapters in an episode")
+	cmd.Flags().Duration("minimum-episode-length", 20, "Minimum runtime of an episode")
+}
+
+func newEpisodeBuilderOptionsFromFlags(cmd *cobra.Command) mediakit.EpisodeBuilderOptions {
+	endingChapterTime, _ := cmd.Flags().GetDuration("ending-chapter-time")
+	minimumChapters, _ := cmd.Flags().GetInt("minimum-chapters")
+	minimumEpisodeLength, _ := cmd.Flags().GetDuration("minimum-episode-length")
+	return mediakit.EpisodeBuilderOptions{
+		EndingChapterTime:    endingChapterTime * time.Second,
+		MinimumChapters:      minimumChapters,
+		MinimumEpisodeLength: minimumEpisodeLength * time.Minute,
+	}
 }
 
 func loadIFrames(sourceFilename, iframesFilename string) ([]time.Duration, error) {
