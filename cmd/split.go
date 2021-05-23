@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
+	"github.com/neptune-media/MediaKit-go/tasks"
 	"github.com/neptune-media/MediaKit-go/tools/mkvmerge"
 	"github.com/neptune-media/MediaKit-go/tools/mkvpropedit"
 	"log"
@@ -52,7 +53,7 @@ var splitCmd = &cobra.Command{
 				return
 			}
 		} else {
-			frames, err = mediakit.ReadVideoIFrames(inputFilename)
+			frames, err = tasks.ReadVideoIFrames(inputFilename)
 			if err != nil {
 				fmt.Printf("error while reading IFrames: %+v\n", err)
 				return
@@ -65,7 +66,7 @@ var splitCmd = &cobra.Command{
 
 		// Build episodes from file
 		fmt.Printf("Building episodes from file\n")
-		episodes, err := mediakit.ReadVideoEpisodes(inputFilename, opts)
+		episodes, err := tasks.ReadVideoEpisodes(inputFilename, opts)
 		if err != nil {
 			fmt.Printf("error while reading episodes: %+v\n", err)
 			return

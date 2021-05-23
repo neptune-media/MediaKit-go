@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
+	"github.com/neptune-media/MediaKit-go/tasks"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -19,11 +19,6 @@ var episodesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		inputFilename := args[0]
 		alignChapters, err := cmd.Flags().GetBool("align-chapters")
-		if err != nil {
-			fmt.Printf("error while reading flag: %v\n", err)
-			return
-		}
-		printMKVCommand, err := cmd.Flags().GetBool("print-mkv-command")
 		if err != nil {
 			fmt.Printf("error while reading flag: %v\n", err)
 			return
@@ -55,7 +50,7 @@ var episodesCmd = &cobra.Command{
 					return
 				}
 			} else {
-				frames, err = mediakit.ReadVideoIFrames(inputFilename)
+				frames, err = tasks.ReadVideoIFrames(inputFilename)
 				if err != nil {
 					fmt.Printf("error while reading IFrames: %+v\n", err)
 					return
@@ -69,35 +64,18 @@ var episodesCmd = &cobra.Command{
 		// matroska-go outputs every block and is super noisy
 		log.SetOutput(new(Sink))
 
-		if episodes, err := mediakit.ReadVideoEpisodes(inputFilename, opts); err != nil {
+		if episodes, err := tasks.ReadVideoEpisodes(inputFilename, opts); err != nil {
 			fmt.Printf("error while reading episodes: %+v\n", err)
 			return
 		} else {
-			if printMKVCommand {
-				partList := make([]string, len(episodes))
-				for i, episode := range episodes {
-					partList[i] = fmt.Sprintf(
-						"%dms-%dms",
-						episode.Chapters[0].TimeStart,
-						episode.Chapters[len(episode.Chapters)-1].TimeEnd,
-					)
-				}
-
+			for i, episode := range episodes {
 				fmt.Fprintf(os.Stdout,
-					"mkvmerge -o output.mkv --split parts:%s \"%s\"",
-					strings.Join(partList, ","),
-					inputFilename,
+					"%d %d - %d (%.1f minutes)\n",
+					i,
+					episode.Chapters[0].TimeStart,
+					episode.Chapters[len(episode.Chapters)-1].TimeEnd,
+					episode.Runtime().Minutes(),
 				)
-			} else {
-				for i, episode := range episodes {
-					fmt.Fprintf(os.Stdout,
-						"%d %d - %d (%.1f minutes)\n",
-						i,
-						episode.Chapters[0].TimeStart,
-						episode.Chapters[len(episode.Chapters)-1].TimeEnd,
-						episode.Runtime().Minutes(),
-					)
-				}
 			}
 		}
 	},
@@ -116,6 +94,5 @@ func init() {
 	// is called directly, e.g.:
 	// episodesCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	episodesCmd.Flags().BoolP("align-chapters", "", false, "Align chapter markers to iframes")
-	episodesCmd.Flags().BoolP("print-mkv-command", "", false, "Print mkvmerge commands to split file")
 	episodesCmd.Flags().String("iframes", "", "Path to a file containing IFrame data for the video file")
 }

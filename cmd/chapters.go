@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/neptune-media/MediaKit-go"
+	"github.com/neptune-media/MediaKit-go/tasks"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -26,7 +26,7 @@ var chaptersCmd = &cobra.Command{
 
 		// matroska-go outputs every block and is super noisy
 		log.SetOutput(new(Sink))
-		if chapters, err := mediakit.ReadVideoChapters(inputFilename); err != nil {
+		if chapters, err := tasks.ReadVideoChapters(inputFilename); err != nil {
 			fmt.Printf("error while reading chapters: %+v\n", err)
 			return
 		} else {

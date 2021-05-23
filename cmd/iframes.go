@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	mediakit "github.com/neptune-media/MediaKit-go"
+	"github.com/neptune-media/MediaKit-go/tasks"
 	"os"
 	"time"
 
@@ -27,7 +28,7 @@ var iframesCmd = &cobra.Command{
 		}
 
 		startTime := time.Now()
-		if frames, err := mediakit.ReadVideoIFrames(inputFilename); err != nil {
+		if frames, err := tasks.ReadVideoIFrames(inputFilename); err != nil {
 			fmt.Printf("error while reading IFrames: %+v\n", err)
 			return
 		} else {
