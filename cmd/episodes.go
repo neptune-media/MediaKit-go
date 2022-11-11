@@ -107,7 +107,7 @@ func newEpisodeBuilderOptionsFromFlags(cmd *cobra.Command) mediakit.EpisodeBuild
 
 func loadIFrames(sourceFilename, iframesFilename string) ([]time.Duration, error) {
 	if iframesFilename == "" {
-		return tasks.ReadVideoIFrames(sourceFilename)
+		return tasks.ReadVideoIFramesFromFile(sourceFilename)
 	}
 
 	fmt.Printf("iframes file: %s\n", iframesFilename)
