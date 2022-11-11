@@ -2,61 +2,90 @@ package ffprobe
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"github.com/neptune-media/MediaKit-go/tools"
 	"io"
-	"os/exec"
-	"sync"
 )
 
-type Runner struct {
+type FFProbe struct {
 	Filename string
+
+	GetFrameCount bool
+	GetFrames     bool
+	LowPriority   bool
+
+	stdout       []byte
+	stderr       []byte
+	stdoutBuffer bytes.Buffer
+	stderrBuffer bytes.Buffer
 }
 
-func (r *Runner) GetFrames() (*Output, error) {
-	data, err := r.execAndWait("-select_streams",
+func (f *FFProbe) Do() error {
+	return f.DoWithContext(context.Background())
+}
+
+func (f *FFProbe) DoWithContext(ctx context.Context) error {
+	// Reset buffers
+	f.stdout = make([]byte, 0)
+	f.stderr = make([]byte, 0)
+	f.stdoutBuffer.Reset()
+	f.stderrBuffer.Reset()
+
+	// Execute
+	err := tools.ExecTool(ctx, f)
+
+	// Copy output to buffer for later
+	f.stdout = make([]byte, f.stdoutBuffer.Len())
+	f.stderr = make([]byte, f.stderrBuffer.Len())
+	copy(f.stdout, f.stdoutBuffer.Bytes())
+	copy(f.stderr, f.stderrBuffer.Bytes())
+
+	return err
+}
+
+func (f *FFProbe) GetCommand() string {
+	return "ffprobe"
+}
+
+func (f *FFProbe) GetCommandArgs() []string {
+	args := []string{
+		"-select_streams",
 		"v",
-		"-show_frames",
 		"-of",
 		"json=compact=1",
-		r.Filename)
-	if err != nil {
-		return nil, err
 	}
 
-	return ReadFFProbeOutput(bytes.NewReader(data))
+	if f.GetFrameCount {
+		args = append(args, "-show_streams", "-count_frames")
+	}
+
+	if f.GetFrames {
+		args = append(args, "-show_frames")
+	}
+
+	args = append(args, f.Filename)
+	return args
 }
 
-func (r *Runner) execAndWait(args ...string) ([]byte, error) {
-	c := exec.Command("ffprobe", args...)
+func (f *FFProbe) GetOutput() (*Output, error) {
+	output := &Output{}
+	err := json.Unmarshal(f.stdout, output)
+	return output, err
+}
 
-	stdout, err := c.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
+func (f *FFProbe) GetStdout() []byte {
+	return f.stdout
+}
 
-	if err := c.Start(); err != nil {
-		return nil, err
-	}
+func (f *FFProbe) GetStderr() []byte {
+	return f.stderr
+}
 
-	var buf bytes.Buffer
-	bufLock := &sync.Mutex{}
-	go func() {
-		bufLock.Lock()
-		defer bufLock.Unlock()
-		for {
-			if _, err := io.Copy(&buf, stdout); err != nil {
-				return
-			}
-		}
-	}()
+func (f *FFProbe) GetOutputBuffers() (io.Writer, io.Writer) {
+	return &f.stdoutBuffer, &f.stderrBuffer
+}
 
-	if err := c.Wait(); err != nil {
-		return nil, err
-	}
-	bufLock.Lock()
-	defer bufLock.Unlock()
-
-	arr := make([]byte, buf.Len())
-	copy(arr, buf.Bytes())
-
-	return arr, nil
+func (f *FFProbe) IsLowPriority() bool {
+	return f.LowPriority
 }

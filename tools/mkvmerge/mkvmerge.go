@@ -1,53 +1,81 @@
 package mkvmerge
 
 import (
-	"os/exec"
-	"strings"
+	"bytes"
+	"context"
+	"github.com/neptune-media/MediaKit-go/tools"
+	"io"
 )
 
-type Runner struct {
+type MKVMerge struct {
 	Args           []string
 	InputFilename  string
+	LowPriority    bool
 	OutputFilename string
 
-	output []byte
+	stdout       []byte
+	stderr       []byte
+	stdoutBuffer bytes.Buffer
+	stderrBuffer bytes.Buffer
 }
 
-func (r *Runner) Do() error {
-	args := r.buildArgs()
-	c := exec.Command("mkvmerge", args...)
-	o, err := c.CombinedOutput()
+func (m *MKVMerge) Do() error {
+	return m.DoWithContext(context.Background())
+}
 
-	r.output = make([]byte, len(o))
-	copy(r.output, o)
+func (m *MKVMerge) DoWithContext(ctx context.Context) error {
+	// Reset buffers
+	m.stdout = make([]byte, 0)
+	m.stderr = make([]byte, 0)
+	m.stdoutBuffer.Reset()
+	m.stderrBuffer.Reset()
+
+	// Execute
+	err := tools.ExecTool(ctx, m)
+
+	// Copy output to buffer for later
+	m.stdout = make([]byte, m.stdoutBuffer.Len())
+	m.stderr = make([]byte, m.stderrBuffer.Len())
+	copy(m.stdout, m.stdoutBuffer.Bytes())
+	copy(m.stderr, m.stderrBuffer.Bytes())
+
 	return err
 }
 
-func (r *Runner) GetCommandString() string {
-	cmd := []string{"mkvmerge"}
-	cmd = append(cmd, r.buildArgs()...)
-	return strings.Join(cmd, " ")
+func (m *MKVMerge) GetCommand() string {
+	return "mkvmerge"
 }
 
-func (r *Runner) GetOutput() []byte {
-	o := make([]byte, len(r.output))
-	copy(o, r.output)
-	return o
-}
+func (m *MKVMerge) GetCommandArgs() []string {
+	args := make([]string, 0)
 
-func (r *Runner) buildArgs() []string {
-	var args []string
-	if r.OutputFilename != "" {
-		args = append(args, "-o", r.OutputFilename)
+	if m.OutputFilename != "" {
+		args = append(args, "-o", m.OutputFilename)
 	}
 
-	if len(r.Args) > 0 {
-		args = append(args, r.Args...)
+	if len(m.Args) > 0 {
+		args = append(args, m.Args...)
 	}
 
-	if r.InputFilename != "" {
-		args = append(args, r.InputFilename)
+	if m.InputFilename != "" {
+		args = append(args, m.InputFilename)
 	}
 
 	return args
+}
+
+func (m *MKVMerge) GetStdout() []byte {
+	return m.stdout
+}
+
+func (m *MKVMerge) GetStderr() []byte {
+	return m.stderr
+}
+
+func (m *MKVMerge) GetOutputBuffers() (io.Writer, io.Writer) {
+	return &m.stdoutBuffer, &m.stderrBuffer
+}
+
+func (m *MKVMerge) IsLowPriority() bool {
+	return m.LowPriority
 }

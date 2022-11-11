@@ -1,48 +1,76 @@
 package mkvpropedit
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"github.com/neptune-media/MediaKit-go"
+	"github.com/neptune-media/MediaKit-go/tools"
 	"github.com/neptune-media/MediaKit-go/tools/mkvmerge"
+	"io"
 	"os"
-	"os/exec"
-	"strings"
 )
 
-type Runner struct {
+type MKVPropedit struct {
 	ChaptersFilename string
 	Filename         string
+	LowPriority      bool
 
-	output []byte
+	stdout       []byte
+	stderr       []byte
+	stdoutBuffer bytes.Buffer
+	stderrBuffer bytes.Buffer
 }
 
-func (r *Runner) Do() error {
-	c := exec.Command("mkvpropedit", r.buildArgs()...)
-	o, err := c.CombinedOutput()
+func (m *MKVPropedit) Do() error {
+	return m.DoWithContext(context.Background())
+}
 
-	r.output = make([]byte, len(o))
-	copy(r.output, o)
+func (m *MKVPropedit) DoWithContext(ctx context.Context) error {
+	// Reset buffers
+	m.stdout = make([]byte, 0)
+	m.stderr = make([]byte, 0)
+	m.stdoutBuffer.Reset()
+	m.stderrBuffer.Reset()
+
+	// Execute
+	err := tools.ExecTool(ctx, m)
+
+	// Copy output to buffer for later
+	m.stdout = make([]byte, m.stdoutBuffer.Len())
+	m.stderr = make([]byte, m.stderrBuffer.Len())
+	copy(m.stdout, m.stdoutBuffer.Bytes())
+	copy(m.stderr, m.stderrBuffer.Bytes())
+
 	return err
 }
 
-func (r *Runner) GetCommandString() string {
-	cmd := []string{"mkvpropedit"}
-	cmd = append(cmd, r.buildArgs()...)
-	return strings.Join(cmd, " ")
+func (m *MKVPropedit) GetCommand() string {
+	return "mkvpropedit"
 }
 
-func (r *Runner) GetOutput() []byte {
-	o := make([]byte, len(r.output))
-	copy(o, r.output)
-	return o
-}
-
-func (r *Runner) buildArgs() []string {
+func (m *MKVPropedit) GetCommandArgs() []string {
 	return []string{
-		r.Filename,
+		m.Filename,
 		"-c",
-		r.ChaptersFilename,
+		m.ChaptersFilename,
 	}
+}
+
+func (m *MKVPropedit) GetStdout() []byte {
+	return m.stdout
+}
+
+func (m *MKVPropedit) GetStderr() []byte {
+	return m.stderr
+}
+
+func (m *MKVPropedit) GetOutputBuffers() (io.Writer, io.Writer) {
+	return &m.stdoutBuffer, &m.stderrBuffer
+}
+
+func (m *MKVPropedit) IsLowPriority() bool {
+	return m.LowPriority
 }
 
 func FixEpisodeChapterNames(episodes []mediakit.Episode, filename string) error {
@@ -54,13 +82,13 @@ func FixEpisodeChapterNames(episodes []mediakit.Episode, filename string) error 
 			return err
 		}
 
-		runner := &Runner{
+		runner := &MKVPropedit{
 			ChaptersFilename: chFilename,
 			Filename:         videoFilename,
 		}
 		if err := runner.Do(); err != nil {
 			fmt.Printf("error while updating file: %v\n", err)
-			fmt.Printf("output from command:\n%s\n", runner.GetOutput())
+			fmt.Printf("output from command:\n%s\n%s\n", runner.GetStdout(), runner.GetStderr())
 			return err
 		}
 

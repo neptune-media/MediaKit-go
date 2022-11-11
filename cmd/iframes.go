@@ -37,7 +37,7 @@ var iframesCmd = &cobra.Command{
 		}
 
 		startTime := time.Now()
-		if frames, err := tasks.ReadVideoIFrames(inputFilename); err != nil {
+		if frames, err := tasks.ReadVideoIFramesFromFile(inputFilename); err != nil {
 			return fmt.Errorf("error while reading IFrames: %v", err)
 		} else {
 			readTime := time.Now().Sub(startTime)
