@@ -10,6 +10,7 @@ import (
 	"github.com/neptune-media/MediaKit-go/tools/mkvpropedit"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -69,13 +70,14 @@ var splitCmd = &cobra.Command{
 			"output.mkv",
 			episodes,
 		)
+		runner.LowPriority = true
 
 		if printCommands {
-			fmt.Fprintf(os.Stdout, "%s", runner.GetCommandString())
+			fmt.Fprintf(os.Stdout, "%s %s", runner.GetCommand(), strings.Join(runner.GetCommandArgs(), " "))
 		} else {
 			fmt.Printf("Splitting file into multiple episodes\n")
 			if err := runner.Do(); err != nil {
-				return fmt.Errorf("error while splitting file: %v\noutput from command:\n%s", err, runner.GetOutput())
+				return fmt.Errorf("error while splitting file: %v\noutput from command:\n%s\n%s", err, runner.GetStdout(), runner.GetStderr())
 			}
 
 			fmt.Printf("Correcting episode chapter names\n")

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func NewSplitter(input, output string, episodes []mediakit.Episode) *Runner {
+func NewSplitter(input, output string, episodes []mediakit.Episode) *MKVMerge {
 
 	// Generate split part list
 	splitPartList := make([]string, len(episodes))
@@ -23,7 +23,7 @@ func NewSplitter(input, output string, episodes []mediakit.Episode) *Runner {
 		fmt.Sprintf("parts:%s", strings.Join(splitPartList, ",")),
 	}
 
-	return &Runner{
+	return &MKVMerge{
 		Args:           args,
 		InputFilename:  input,
 		OutputFilename: output,

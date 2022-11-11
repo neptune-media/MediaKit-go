@@ -9,7 +9,7 @@ import (
 
 func ReadVideoIFramesFromFile(filename string) ([]time.Duration, error) {
 	fmt.Printf("Analyzing file, this may take a few minutes...\n")
-	runner := &ffprobe.FFProbe{Filename: filename, GetFrames: true}
+	runner := &ffprobe.FFProbe{Filename: filename, GetFrames: true, LowPriority: true}
 	return ReadVideoIFrames(runner)
 }
 

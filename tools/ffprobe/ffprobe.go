@@ -35,7 +35,7 @@ func (f *FFProbe) DoWithContext(ctx context.Context) error {
 	// Execute
 	err := tools.ExecTool(ctx, f)
 
-	// Copy output to buffers for later
+	// Copy output to buffer for later
 	f.stdout = make([]byte, f.stdoutBuffer.Len())
 	f.stderr = make([]byte, f.stderrBuffer.Len())
 	copy(f.stdout, f.stdoutBuffer.Bytes())
