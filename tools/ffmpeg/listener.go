@@ -9,12 +9,15 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ProgressListener is a TCP listener for handling progress reports from
 // ffmpeg when using the -progress flag
 type ProgressListener struct {
-	listener *net.TCPListener
+	// ReportInterval determines how often a progress report is printed (0 for print every report)
+	ReportInterval time.Duration
+	listener       *net.TCPListener
 }
 
 // ProgressReport represents a single progress update when running ffmpeg
@@ -64,6 +67,8 @@ func (p *ProgressListener) Run(logger *zap.SugaredLogger) {
 
 	reader := bufio.NewReader(conn)
 	report := &ProgressReport{}
+	nextReport := time.Time{}
+
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -90,15 +95,24 @@ func (p *ProgressListener) Run(logger *zap.SugaredLogger) {
 		case "total_size":
 			report.TotalSize, _ = strconv.Atoi(value)
 		case "progress":
-			logger.Infow("ffmpeg progress",
-				"bitrate", report.Bitrate,
-				"frame", report.Frame,
-				"fps", fmt.Sprintf("%.02f", report.FPS),
-				"out_time", report.OutTime,
-				"speed", report.Speed,
-				"total_size", report.TotalSize,
-			)
-			if value == "end" {
+			end := value == "end"
+
+			// Always print last report or if ReportInterval is 0
+			if end || p.ReportInterval == 0 || time.Now().After(nextReport) {
+				logger.Infow("ffmpeg progress",
+					"bitrate", report.Bitrate,
+					"frame", report.Frame,
+					"fps", fmt.Sprintf("%.02f", report.FPS),
+					"out_time", report.OutTime,
+					"speed", report.Speed,
+					"total_size", report.TotalSize,
+				)
+
+				// Schedule next report
+				nextReport = time.Now().Add(p.ReportInterval)
+			}
+
+			if end {
 				return
 			}
 		default:
