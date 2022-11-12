@@ -2,8 +2,10 @@ package mediakit
 
 import "time"
 
+// FrameSeeker contains a collection of frame timecodes, and provides methods
+// for moving between frames of interest
 type FrameSeeker struct {
-	Frames []time.Duration
+	Frames FrameArray
 	pos    int
 }
 

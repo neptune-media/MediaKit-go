@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+// ReduceProcessPriority is a multi-os helper for reducing
+// the run priority of a process.
 func ReduceProcessPriority(p *os.Process) error {
 	// Acquire a handle to the child process
 	// PROCESS_SET_INFORMATION is the access level needed when calling SetPriorityClass

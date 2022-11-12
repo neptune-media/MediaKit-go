@@ -5,6 +5,7 @@ import (
 	"github.com/pixelbender/go-matroska/matroska"
 )
 
+// ReadVideoChapters will read the specified file, and return an array of chapters
 func ReadVideoChapters(filename string) ([]mediakit.Chapter, error) {
 	chapters := make([]mediakit.Chapter, 0)
 

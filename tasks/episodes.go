@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// ReadVideoEpisodes will read the specified file, and return a list of episodes based on
+// the provided episode builder options
 func ReadVideoEpisodes(filename string, opts mediakit.EpisodeBuilderOptions) ([]mediakit.Episode, error) {
 	episodes := make([]mediakit.Episode, 0)
 	chapters, err := ReadVideoChapters(filename)
@@ -42,6 +44,8 @@ func ReadVideoEpisodes(filename string, opts mediakit.EpisodeBuilderOptions) ([]
 	return episodes, nil
 }
 
+// AlignChaptersToIFrames is used to modify the provided list of chapters to align
+// them with I-frames to reduce video corruption when splitting.
 func AlignChaptersToIFrames(chapters []mediakit.Chapter, seeker *mediakit.FrameSeeker) {
 	for chIndex, chapter := range chapters {
 		for {

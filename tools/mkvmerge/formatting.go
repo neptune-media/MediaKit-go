@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// FormatSplitOutputName is used to generate filenames when splitting
+// a single input video into multiple output videos
 func FormatSplitOutputName(outputFilename string, index int) string {
 	dirname, filename := filepath.Split(outputFilename)
 	ext := filepath.Ext(filename)
