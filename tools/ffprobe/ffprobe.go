@@ -8,12 +8,17 @@ import (
 	"io"
 )
 
+// FFProbe is a wrapper for the ffprobe binary
 type FFProbe struct {
+	// Filename is the path of the file to analyze
 	Filename string
 
+	// GetFrameCount - when true, counts the number of frames in Filename
 	GetFrameCount bool
-	GetFrames     bool
-	LowPriority   bool
+	// GetFrame - when true, returns details of every frame in Filename
+	GetFrames bool
+	// LowPriority - when true, runs the ffprobe at a low process priority
+	LowPriority bool
 
 	stdout       []byte
 	stderr       []byte

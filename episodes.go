@@ -4,11 +4,16 @@ import (
 	"time"
 )
 
+// Episode is a collection of chapters in a multi-episode video file
 type Episode struct {
+	// Chapters is a list of chapters that make an episode
 	Chapters []Chapter
-	Discard  bool
+	// Discard - when true, don't write episode to a file
+	Discard bool
 }
 
+// EpisodeBuilderOptions is used to provide hints to the builder
+// when processing a multi-episode video file.
 type EpisodeBuilderOptions struct {
 	// Last added chapter must exceed this to continue adding chapters
 	EndingChapterTime time.Duration

@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+// NewSplitter returns a MKVMerge object configured to split the
+// input file into multiple output files based on the provided
+// episodes.
 func NewSplitter(input, output string, episodes []mediakit.Episode) *MKVMerge {
 
 	// Generate split part list

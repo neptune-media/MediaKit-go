@@ -7,10 +7,15 @@ import (
 	"io"
 )
 
+// MKVMerge is a wrapper for the mkvmerge binary
 type MKVMerge struct {
-	Args           []string
-	InputFilename  string
-	LowPriority    bool
+	// Args is a list of raw arguments to pass to mkvmerge
+	Args []string
+	// InputFilename is the path of the file to read
+	InputFilename string
+	// LowPriority - when true, runs the mkvmerge at a low process priority
+	LowPriority bool
+	// OutputFilename is the path of the file to write
 	OutputFilename string
 
 	stdout       []byte

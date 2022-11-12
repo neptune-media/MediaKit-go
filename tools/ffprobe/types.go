@@ -1,5 +1,6 @@
 package ffprobe
 
+// FrameInfo represents a single frame in a video
 type FrameInfo struct {
 	MediaType   string `json:"media_type"`
 	StreamIndex int    `json:"stream_index"`
@@ -9,11 +10,13 @@ type FrameInfo struct {
 	PTS         int    `json:"pts"`
 }
 
+// Output encapsulates the output of ffprobe
 type Output struct {
 	Frames  []FrameInfo `json:"frames"`
 	Streams []Stream
 }
 
+// Stream represents a single stream in a file
 type Stream struct {
 	AvgFrameRate        string `json:"avg_frame_rate"`
 	ChromaLocation      string `json:"chroma_location"`

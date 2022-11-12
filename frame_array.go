@@ -6,10 +6,11 @@ import (
 	"time"
 )
 
+// FrameArray is a list of timecodes representing frame positions in a video file
 type FrameArray []time.Duration
 
-func ReadFrameArray(r io.Reader) ([]time.Duration, error) {
-	frames := make([]time.Duration, 0)
+func ReadFrameArray(r io.Reader) (FrameArray, error) {
+	frames := make(FrameArray, 0)
 	for {
 		var t time.Duration
 		if _, err := fmt.Fscanf(r, "%d\n", &t); err != nil {

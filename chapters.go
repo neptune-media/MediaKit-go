@@ -4,11 +4,24 @@ import (
 	"time"
 )
 
+// Chapter represents a chapter within a video file
 type Chapter struct {
-	ID        uint64
+	// ID is the chapter id provided by the video file
+	ID uint64
+
+	// TimeStart is the start time of the chapter.  The units
+	// are determined by the time scale provided by the
+	// video.
 	TimeStart int64
-	TimeEnd   int64
-	Enabled   bool
+
+	// TimeEnd is the end time of the chapter.  The units
+	// are determined by the time scale provided by the
+	// video.
+	TimeEnd int64
+
+	// Enabled is a flag indicated if the chapter is enabled
+	// in the video file.
+	Enabled bool
 }
 
 func (c Chapter) EndTime() time.Duration {
