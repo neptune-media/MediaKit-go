@@ -17,7 +17,10 @@ import (
 type ProgressListener struct {
 	// ReportInterval determines how often a progress report is printed (0 for print every report)
 	ReportInterval time.Duration
-	listener       *net.TCPListener
+	// TotalFrameCount is the total number of frames in the input file
+	TotalFrameCount int
+
+	listener *net.TCPListener
 }
 
 // ProgressReport represents a single progress update when running ffmpeg
@@ -99,14 +102,19 @@ func (p *ProgressListener) Run(logger *zap.SugaredLogger) {
 
 			// Always print last report or if ReportInterval is 0
 			if end || p.ReportInterval == 0 || time.Now().After(nextReport) {
-				logger.Infow("ffmpeg progress",
-					"bitrate", report.Bitrate,
-					"frame", report.Frame,
-					"fps", fmt.Sprintf("%.02f", report.FPS),
-					"out_time", report.OutTime,
-					"speed", report.Speed,
-					"total_size", report.TotalSize,
-				)
+				fields := []interface{}{
+					zap.String("bitrate", report.Bitrate),
+					zap.Int("frame", report.Frame),
+					zap.String("fps", fmt.Sprintf("%.02f", report.FPS)),
+					zap.String("out_time", report.OutTime),
+					zap.String("speed", report.Speed),
+					zap.Int("total_size", report.TotalSize),
+				}
+				if p.TotalFrameCount > 0 {
+					fields = append(fields, zap.Int("total_frames", p.TotalFrameCount))
+					fields = append(fields, zap.String("percent", fmt.Sprintf("%.02f%%", 100.0*float64(report.Frame)/float64(p.TotalFrameCount))))
+				}
+				logger.Infow("ffmpeg progress", fields...)
 
 				// Schedule next report
 				nextReport = time.Now().Add(p.ReportInterval)
