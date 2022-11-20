@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/neptune-media/MediaKit-go/tools"
 	"io"
 )
@@ -19,6 +20,10 @@ type FFProbe struct {
 	GetFrames bool
 	// LowPriority - when true, runs the ffprobe at a low process priority
 	LowPriority bool
+	// Threads - determines the number of CPU threads to use (0 for auto)
+	Threads int
+	// UseThreads - when true, sets the -threads flag with Threads value
+	UseThreads bool
 
 	stdout       []byte
 	stderr       []byte
@@ -67,6 +72,10 @@ func (f *FFProbe) GetCommandArgs() []string {
 
 	if f.GetFrames {
 		args = append(args, "-show_frames")
+	}
+
+	if f.UseThreads {
+		args = append(args, "-threads", fmt.Sprintf("%d", f.Threads))
 	}
 
 	args = append(args, f.Filename)
