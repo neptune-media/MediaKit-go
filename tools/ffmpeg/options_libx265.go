@@ -19,7 +19,7 @@ type Libx265Options struct {
 	UseCRF bool
 }
 
-func (o *Libx265Options) GetCodecOptions() []string {
+func (o *Libx265Options) GetOptions() []string {
 	args := []string{
 		"libx265",
 	}

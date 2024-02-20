@@ -26,6 +26,9 @@ type FFmpeg struct {
 	// Audio output encoding options
 	AudioOptions EncodingOptions
 
+	// Output container options
+	ContainerOptions EncodingOptions
+
 	// Discard audio from output
 	DiscardAudio bool
 
@@ -35,14 +38,20 @@ type FFmpeg struct {
 	// Discard video from output
 	DiscardVideo bool
 
-	// Modifies output to enable "Fast Start" for web streaming
-	EnableFastStart bool
-
 	// A list of raw args to set for input
 	InputArgs []string
 
 	// Path to read input from
 	InputFilename string
+
+	// Sets -map 0:a, used when no audio languages are specified
+	MapAllAudioStreams bool
+
+	// Sets -map 0:s, used when no subtitle languages are specified
+	MapAllSubtitleStreams bool
+
+	// Sets -map 0:v instead of -map 0:v:0, to select all video streams instead of the first
+	MapAllVideoStreams bool
 
 	// A list of raw args to set for output
 	OutputArgs []string
@@ -107,38 +116,50 @@ func (f *FFmpeg) GetCommandArgs() []string {
 		args = append(args, "-an")
 	} else if f.AudioOptions != nil {
 		args = append(args, "-c:a")
-		args = append(args, f.AudioOptions.GetCodecOptions()...)
+		args = append(args, f.AudioOptions.GetOptions()...)
 	}
 
 	if f.DiscardSubtitles {
 		args = append(args, "-sn")
 	} else if f.SubtitleOptions != nil {
 		args = append(args, "-c:s")
-		args = append(args, f.SubtitleOptions.GetCodecOptions()...)
+		args = append(args, f.SubtitleOptions.GetOptions()...)
 	}
 
 	if f.DiscardVideo {
 		args = append(args, "-vn")
 	} else if f.VideoOptions != nil {
 		args = append(args, "-c:v")
-		args = append(args, f.VideoOptions.GetCodecOptions()...)
+		args = append(args, f.VideoOptions.GetOptions()...)
 	}
 
-	if f.EnableFastStart {
-		args = append(args, "-movflags", "+faststart")
+	if f.ContainerOptions != nil {
+		args = append(args, f.ContainerOptions.GetOptions()...)
 	}
 
-	args = append(args, "-map", "0:v:0")
+	if !f.DiscardVideo {
+		args = append(args, "-map")
+		if f.MapAllVideoStreams {
+			args = append(args, "0:v")
+		} else {
+			args = append(args, "0:v:0")
+		}
+	}
+
 	if len(f.AudioLanguages) > 0 {
 		for _, lang := range f.AudioLanguages {
 			args = append(args, "-map", fmt.Sprintf("0:a:m:language:%s", lang))
 		}
+	} else if f.MapAllAudioStreams {
+		args = append(args, "-map", "0:a")
 	}
 
 	if len(f.SubtitleLanguages) > 0 {
 		for _, lang := range f.SubtitleLanguages {
 			args = append(args, "-map", fmt.Sprintf("0:s:m:language:%s", lang))
 		}
+	} else if f.MapAllSubtitleStreams {
+		args = append(args, "-map", "0:s")
 	}
 
 	args = append(args, f.OutputArgs...)
