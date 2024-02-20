@@ -19,7 +19,7 @@ type Libx264Options struct {
 	UseQP bool
 }
 
-func (o *Libx264Options) GetCodecOptions() []string {
+func (o *Libx264Options) GetOptions() []string {
 	args := []string{
 		"libx264",
 	}
