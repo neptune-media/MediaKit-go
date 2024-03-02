@@ -60,8 +60,6 @@ func (f *FFProbe) GetCommand() string {
 
 func (f *FFProbe) GetCommandArgs() []string {
 	args := []string{
-		"-select_streams",
-		"v",
 		"-of",
 		"json=compact=1",
 	}
