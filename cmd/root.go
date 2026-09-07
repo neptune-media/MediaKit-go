@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+	"strings"
 
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
-
-var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -17,47 +18,82 @@ var rootCmd = &cobra.Command{
 	Short: "Sample apps for testing library functionality",
 	Long: `MediaKit provides a library for extracting video chunks from
 a single video track, using ffmpeg.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return bindFlagsToViper(cmd)
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func bindFlagsToViper(cmd *cobra.Command) error {
+	flagSets := []*pflag.FlagSet{
+		cmd.PersistentFlags(),
+		cmd.Flags(),
+	}
+	for _, flags := range flagSets {
+		if err := viper.BindPFlags(flags); err != nil {
+			return fmt.Errorf("error while binding flags: %s", err)
+		}
+	}
+
+	return nil
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.MediaKit.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().String(ArgLogFormat, "console", "Log format (json, console)")
+	rootCmd.PersistentFlags().String(ArgLogLevel, "info", "Log level (debug, info, warn, error, fatal)")
+	rootCmd.PersistentFlags().Bool(ArgLowPriority, false, "Runs subprocesses (codec/mkvmerge/etc) at a lower process priority")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".MediaKit" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".MediaKit")
-	}
-
+	viper.SetEnvPrefix("mediakit")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv() // read in environment variables that match
+}
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+func initLogger() *zap.Logger {
+	loggerCfg := newLoggerConfig()
+	logger, err := loggerCfg.Build()
+	if err != nil {
+		panic(err)
 	}
+	return logger
+}
+
+func newLoggerConfig() *zap.Config {
+	level, err := zap.ParseAtomicLevel(viper.GetString(ArgLogLevel))
+	if err != nil {
+		panic(err)
+	}
+
+	cfg := &zap.Config{
+		Development:      false,
+		EncoderConfig:    zap.NewProductionEncoderConfig(),
+		ErrorOutputPaths: []string{"stderr"},
+		Level:            level,
+		OutputPaths:      []string{"stdout"},
+	}
+
+	switch viper.GetString(ArgLogFormat) {
+	case "json":
+		cfg.Encoding = "json"
+	default:
+		cfg.Encoding = "console"
+		cfg.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+		cfg.EncoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+		cfg.EncoderConfig.EncodeLevel = zapcore.LowercaseColorLevelEncoder
+		cfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
+	}
+
+	return cfg
 }
