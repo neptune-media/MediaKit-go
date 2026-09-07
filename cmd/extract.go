@@ -15,13 +15,10 @@ import (
 	"github.com/neptune-media/MediaKit-go/pkg/tools/ffprobe"
 )
 
-// framesCmd represents the frames command
-var framesCmd = &cobra.Command{
-	Use:   "frames [file]",
-	Short: "Extracts a list of frames from the given file to parquet",
-	Long: `Extracts a list of frames from the given file and writes the
-information to parquet.  Can optionally print a list of frames to stdout
-instead.`,
+// extractCmd represents the frames command
+var extractCmd = &cobra.Command{
+	Use:   "extract [file]",
+	Short: "Extracts a list of frames and streams from the given file to parquet",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		tool := ffprobe.New()
 		return tool.Validate(cmd.Context())
@@ -31,27 +28,33 @@ instead.`,
 		logger := initLogger()
 		defer logger.Sync()
 
+		// Get input
 		inputFilename := args[0]
 		logger = logger.With(zap.String("job", filepath.Base(inputFilename)))
 		logger.Info("using input file", zap.String("input-file", inputFilename))
 
+		// Prepare output
 		framesFilename := viper.GetString(ArgFramesFile)
 		logger.Info("saving frame info to file", zap.String("frames-file", framesFilename))
 
+		// Open output file, truncate if it already exists
 		outFile, err := os.Create(framesFilename)
 		if err != nil {
 			logger.Fatal("failed to create output file", zap.Error(err))
 		}
 		defer outFile.Close()
 
+		// Create the writer
 		writer := mediakit.NewParquetWriter[ffprobe.Frame](
 			outFile,
 			mediakit.WithCompression[ffprobe.Frame](new(snappy.Codec)),
 		)
 		defer writer.Close()
 
+		// Build the ffprobe command
 		builder := ffprobe.NewBuilder(ffprobe.New(), logger, inputFilename)
 		builder = builder.GetFramesCount().GetFrames()
+
 		if viper.GetBool(ArgThreads) {
 			builder = builder.UseThreads(0)
 		}
@@ -61,18 +64,15 @@ instead.`,
 		}
 
 		tool := builder.Build(cmd.Context())
+
+		// Get stdout for reader
 		stdout, err := tool.StdoutPipe()
 		if err != nil {
 			logger.Fatal("failed to get stdout pipe", zap.Error(err))
 		}
 		defer stdout.Close()
 
-		// stderr, err := tool.StderrPipe()
-		// if err != nil {
-		// 	logger.Fatal("failed to get stderr pipe", zap.Error(err))
-		// }
-		// defer stderr.Close()
-
+		// Start ffprobe
 		err = tool.Start()
 		if err != nil {
 			logger.Fatal("failed to start tool", zap.Error(err))
@@ -81,6 +81,7 @@ instead.`,
 		startTime := time.Now()
 		logger.Info("dumping frames")
 
+		// Start ffprobe reader
 		frameReader := ffprobe.NewReader()
 		frames := frameReader.Frames()
 		go func(r *ffprobe.Reader) {
@@ -93,25 +94,8 @@ instead.`,
 
 		// Stats printer
 		statsCancelFn := newStatsPrinter(cmd.Context(), logger, viper.GetDuration(ArgStatsInterval), frameReader)
-		// statsCtx, statsCancelFn := context.WithCancel(cmd.Context())
-		// go func(ctx context.Context, interval time.Duration) {
-		// 	ticker := time.NewTicker(interval)
-		// 	lastStats := ffprobe.ReaderStats{
-		// 		Time: time.Now(),
-		// 	}
-		// 	for {
-		// 		select {
-		// 		case <-ctx.Done():
-		// 			return
-		// 		case t := <-ticker.C:
-		// 			stats := frameReader.Stats()
-		// 			deltaFrames := stats.DecodedFrames - lastStats.DecodedFrames
-		// 			rate := float64(deltaFrames) / t.Sub(lastStats.Time).Seconds()
-		// 			logger.Info("read progress", zap.Uint("decoded-frames", uint(stats.DecodedFrames)), zap.Uint("fps", uint(rate)))
-		// 		}
-		// 	}
-		// }(statsCtx, time.Minute)
 
+		// Process items from reader
 		err = handleItems(writer, frames)
 		if err != nil {
 			logger.Fatal("failed to write frames", zap.Error(err))
@@ -136,13 +120,13 @@ instead.`,
 }
 
 func init() {
-	rootCmd.AddCommand(framesCmd)
+	rootCmd.AddCommand(extractCmd)
 
-	framesCmd.Flags().String(ArgFramesFile, "", "path to save frame information to")
-	framesCmd.Flags().Bool(ArgLowPriority, false, "When set, runs subprocesses at a lower priority")
-	framesCmd.Flags().Duration(ArgStatsInterval, time.Minute, "Specifies the interval for printing out stats")
-	framesCmd.Flags().Bool(ArgThreads, false, "When set, set subprocess thread flags when appropriate")
-	framesCmd.MarkFlagRequired(ArgFramesFile)
+	extractCmd.Flags().String(ArgFramesFile, "", "path to save frame information to")
+	extractCmd.Flags().Bool(ArgLowPriority, false, "When set, runs subprocesses at a lower priority")
+	extractCmd.Flags().Duration(ArgStatsInterval, time.Minute, "Specifies the interval for printing out stats")
+	extractCmd.Flags().Bool(ArgThreads, false, "When set, set subprocess thread flags when appropriate")
+	extractCmd.MarkFlagRequired(ArgFramesFile)
 }
 
 func handleItems[T any](writer *mediakit.ParquetWriter[T], items <-chan T) error {
