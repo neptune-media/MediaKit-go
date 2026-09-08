@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
+	"github.com/neptune-media/MediaKit-go/cmd/common"
 	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
 	"github.com/neptune-media/MediaKit-go/pkg/tools/ffprobe"
 )
@@ -25,7 +26,7 @@ var extractCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Setup logging
-		logger := initLogger()
+		logger := common.InitLogger()
 		defer logger.Sync()
 
 		// Get input
@@ -55,11 +56,11 @@ var extractCmd = &cobra.Command{
 		builder := ffprobe.NewBuilder(ffprobe.New(), logger, inputFilename)
 		builder = builder.GetFramesCount().GetFrames()
 
-		if viper.GetBool(ArgThreads) {
+		if viper.GetBool(common.ArgThreads) {
 			builder = builder.UseThreads(0)
 		}
 
-		if viper.GetBool(ArgLowPriority) {
+		if viper.GetBool(common.ArgLowPriority) {
 			builder = builder.UseLowPriority()
 		}
 
@@ -93,7 +94,7 @@ var extractCmd = &cobra.Command{
 		}(frameReader)
 
 		// Stats printer
-		statsCancelFn := newStatsPrinter(cmd.Context(), logger, viper.GetDuration(ArgStatsInterval), frameReader)
+		statsCancelFn := newStatsPrinter(cmd.Context(), logger, viper.GetDuration(common.ArgStatsInterval), frameReader)
 
 		// Process items from reader
 		err = handleItems(writer, frames)
@@ -123,9 +124,9 @@ func init() {
 	rootCmd.AddCommand(extractCmd)
 
 	extractCmd.Flags().String(ArgFramesFile, "", "path to save frame information to")
-	extractCmd.Flags().Bool(ArgLowPriority, false, "When set, runs subprocesses at a lower priority")
-	extractCmd.Flags().Duration(ArgStatsInterval, time.Minute, "Specifies the interval for printing out stats")
-	extractCmd.Flags().Bool(ArgThreads, false, "When set, set subprocess thread flags when appropriate")
+	extractCmd.Flags().Bool(common.ArgLowPriority, false, "When set, runs subprocesses at a lower priority")
+	extractCmd.Flags().Duration(common.ArgStatsInterval, time.Minute, "Specifies the interval for printing out stats")
+	extractCmd.Flags().Bool(common.ArgThreads, false, "When set, set subprocess thread flags when appropriate")
 	extractCmd.MarkFlagRequired(ArgFramesFile)
 }
 
