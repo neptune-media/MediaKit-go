@@ -1,5 +1,7 @@
 package ffprobe
 
+import "time"
+
 // Frame represents a single frame in a video
 type Frame struct {
 	KeyFrame    int    `json:"key_frame" mapstructure:"key_frame" parquet:"key_frame,int(8)"`
@@ -11,6 +13,12 @@ type Frame struct {
 
 	Other map[string]any `mapstructure:",remain" parquet:"-"`
 }
+
+func (f Frame) Timecode() time.Duration {
+	return time.Duration(f.PTS) * time.Millisecond
+}
+
+type FrameList []Frame
 
 // Stream represents a single stream in a file
 type Stream struct {
@@ -46,3 +54,5 @@ type Stream struct {
 
 	Other map[string]any `mapstructure:",remain" parquet:"-"`
 }
+
+type StreamList []Stream

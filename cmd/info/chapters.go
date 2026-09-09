@@ -5,11 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-logr/zapr"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/neptune-media/MediaKit-go/cmd/common"
-	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
+	"github.com/neptune-media/MediaKit-go/pkg/mediakit/utils"
 )
 
 // chaptersCmd represents the chapters command
@@ -33,7 +34,7 @@ var chaptersCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		chapters, err := mediakit.ReadVideoChapters(f, logger)
+		chapters, err := utils.ReadVideoChapters(f, zapr.NewLogger(logger))
 		if err != nil {
 			logger.Fatal("failed to parse file", zap.Error(err))
 		}

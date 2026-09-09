@@ -11,7 +11,7 @@ import (
 	"github.com/neptune-media/MediaKit-go/pkg/tools"
 )
 
-type Builder struct {
+type CommandBuilder struct {
 	Filename string
 	Logger   *zap.Logger
 	Tool     *tools.Executable
@@ -41,8 +41,8 @@ func (c *PriorityCmd) Start() error {
 	return nil
 }
 
-func NewBuilder(tool *tools.Executable, logger *zap.Logger, filename string) *Builder {
-	return &Builder{
+func NewCommandBuilder(tool *tools.Executable, logger *zap.Logger, filename string) *CommandBuilder {
+	return &CommandBuilder{
 		Filename: filename,
 		Logger:   logger,
 		Tool:     tool,
@@ -50,7 +50,7 @@ func NewBuilder(tool *tools.Executable, logger *zap.Logger, filename string) *Bu
 	}
 }
 
-func (b *Builder) Build(ctx context.Context) *PriorityCmd {
+func (b *CommandBuilder) Build(ctx context.Context) *PriorityCmd {
 	args := make([]string, len(b.args))
 	copy(args, b.args)
 	args = append(args, b.Filename)
@@ -64,22 +64,22 @@ func (b *Builder) Build(ctx context.Context) *PriorityCmd {
 	return cmd
 }
 
-func (b *Builder) GetFrames() *Builder {
+func (b *CommandBuilder) GetFrames() *CommandBuilder {
 	b.args = append(b.args, "-show_frames")
 	return b
 }
 
-func (b *Builder) GetFramesCount() *Builder {
+func (b *CommandBuilder) GetFramesCount() *CommandBuilder {
 	b.args = append(b.args, "-show_streams", "-count_frames")
 	return b
 }
 
-func (b *Builder) UseLowPriority() *Builder {
+func (b *CommandBuilder) UseLowPriority() *CommandBuilder {
 	b.lowPriority = true
 	return b
 }
 
-func (b *Builder) UseThreads(num int) *Builder {
+func (b *CommandBuilder) UseThreads(num int) *CommandBuilder {
 	b.args = append(b.args, "-threads", fmt.Sprintf("%d", num))
 	return b
 }

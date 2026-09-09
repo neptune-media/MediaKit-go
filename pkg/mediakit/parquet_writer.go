@@ -3,40 +3,47 @@ package mediakit
 import (
 	"io"
 
+	"github.com/go-logr/logr"
 	"github.com/parquet-go/parquet-go"
 	"github.com/parquet-go/parquet-go/compress"
-	"go.uber.org/zap"
 )
 
 type ParquetWriter[T any] struct {
-	Logger *zap.Logger
+	Logger logr.Logger
 
 	parquet.GenericWriter[T]
 }
 
-type parquetWriterOptions struct {
+type parquetOptions struct {
 	Compression compress.Codec
-	Logger      *zap.Logger
+	Logger      logr.Logger
+	UseSchema   bool
 }
 
-type WriterOption[T any] func(opts *parquetWriterOptions)
+type Option[T any] func(opts *parquetOptions)
 
-func WithCompression[T any](codec compress.Codec) WriterOption[T] {
-	return func(opts *parquetWriterOptions) {
+func WithCompression[T any](codec compress.Codec) Option[T] {
+	return func(opts *parquetOptions) {
 		opts.Compression = codec
 	}
 }
 
-func WithLogger[T any](logger *zap.Logger) WriterOption[T] {
-	return func(opts *parquetWriterOptions) {
+func WithLogger[T any](logger logr.Logger) Option[T] {
+	return func(opts *parquetOptions) {
 		opts.Logger = logger
 	}
 }
 
-func NewParquetWriter[T any](w io.Writer, opts ...WriterOption[T]) *ParquetWriter[T] {
+func WithSchema[T any](useSchema bool) Option[T] {
+	return func(opts *parquetOptions) {
+		opts.UseSchema = useSchema
+	}
+}
+
+func NewParquetWriter[T any](w io.Writer, opts ...Option[T]) *ParquetWriter[T] {
 	// Build our options from what the user gave us
-	options := &parquetWriterOptions{
-		Logger: zap.NewNop(),
+	options := &parquetOptions{
+		Logger: logr.Discard(),
 	}
 
 	for _, opt := range opts {
@@ -48,14 +55,13 @@ func NewParquetWriter[T any](w io.Writer, opts ...WriterOption[T]) *ParquetWrite
 	if options.Compression != nil {
 		writerOpts = append(writerOpts, parquet.Compression(options.Compression))
 	}
+	if options.UseSchema {
+		writerOpts = append(writerOpts, parquet.SchemaOf(new(T)))
+	}
 
 	// Create the new writer
 	return &ParquetWriter[T]{
 		GenericWriter: *(parquet.NewGenericWriter[T](w, writerOpts...)),
 		Logger:        options.Logger,
 	}
-}
-
-func (w *ParquetWriter[T]) Close() error {
-	return w.GenericWriter.Close()
 }

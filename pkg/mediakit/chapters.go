@@ -1,11 +1,7 @@
 package mediakit
 
 import (
-	"io"
 	"time"
-
-	"github.com/remko/go-mkvparse"
-	"go.uber.org/zap"
 )
 
 // Chapter represents a chapter within a video file
@@ -52,85 +48,33 @@ func (c Chapter) WithTimescale(ts time.Duration) Chapter {
 	return t
 }
 
-type ChapterHandler struct {
-	Chapters []Chapter
-	Logger   *zap.Logger
+type ChapterList []Chapter
 
-	chapter *Chapter
-	mkvparse.DefaultHandler
+func (l ChapterList) First() Chapter {
+	if l == nil {
+		return Chapter{}
+	}
+
+	return l[0]
 }
 
-func (h *ChapterHandler) HandleInteger(id mkvparse.ElementID, v int64, info mkvparse.ElementInfo) error {
-	switch id {
-	case mkvparse.ChapterFlagEnabledElement:
-		h.chapter.Enabled = v == 1
-	case mkvparse.ChapterTimeEndElement:
-		h.chapter.TimeEnd = v
-	case mkvparse.ChapterTimeStartElement:
-		h.chapter.TimeStart = v
-	case mkvparse.ChapterUIDElement:
-		h.chapter.ID = uint64(v)
+func (l ChapterList) Last() Chapter {
+	if l == nil {
+		return Chapter{}
 	}
 
-	return nil
+	return l[len(l)-1]
 }
 
-func (h *ChapterHandler) HandleMasterBegin(id mkvparse.ElementID, info mkvparse.ElementInfo) (bool, error) {
-	h.Logger.Debug("element:begin", zap.String("element", mkvparse.NameForElementID(id)))
-
-	switch id {
-	case mkvparse.ChapterDisplayElement, mkvparse.ChaptersElement, mkvparse.EditionEntryElement:
-		return true, nil
-	case mkvparse.ChapterAtomElement:
-		h.chapter = &Chapter{}
-		return true, nil
-	default:
-		return false, nil
-		// 	return h.DefaultHandler.HandleMasterBegin(id, info)
-	}
-}
-
-func (h *ChapterHandler) HandleMasterEnd(id mkvparse.ElementID, info mkvparse.ElementInfo) error {
-	h.Logger.Debug("element:end", zap.String("element", mkvparse.NameForElementID(id)))
-
-	switch id {
-	case mkvparse.ChapterAtomElement:
-		h.Chapters = append(h.Chapters, *h.chapter)
-		return nil
-	default:
-		return h.DefaultHandler.HandleMasterEnd(id, info)
-	}
-}
-
-func (h *ChapterHandler) HandleString(id mkvparse.ElementID, v string, info mkvparse.ElementInfo) error {
-	switch id {
-	case mkvparse.ChapStringElement:
-		h.chapter.Title = v
+func (l ChapterList) Runtime() time.Duration {
+	var runtime time.Duration
+	if l == nil {
+		return 0
 	}
 
-	return nil
-}
-
-func ReadVideoChapters(r io.ReadSeeker, logger *zap.Logger) ([]Chapter, error) {
-	chapterHandler := &ChapterHandler{
-		Chapters: make([]Chapter, 0),
-		Logger:   logger,
-	}
-	segmentInfoHandler := &SegmentInfoHandler{
-		Logger:      logger,
-		SegmentInfo: new(SegmentInfo),
+	for _, ch := range l {
+		runtime += ch.Runtime()
 	}
 
-	h := mkvparse.NewHandlerChain(chapterHandler, segmentInfoHandler)
-	err := mkvparse.ParseSections(r, h, mkvparse.InfoElement, mkvparse.ChaptersElement)
-	if err != nil {
-		return nil, err
-	}
-
-	chapters := make([]Chapter, len(chapterHandler.Chapters))
-	for i, c := range chapterHandler.Chapters {
-		chapters[i] = c.WithTimescale(segmentInfoHandler.SegmentInfo.Timescale)
-	}
-
-	return chapters, err
+	return runtime
 }

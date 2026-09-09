@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-logr/zapr"
 	"github.com/parquet-go/parquet-go/compress/snappy"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -35,7 +36,7 @@ var extractCmd = &cobra.Command{
 		logger.Info("using input file", zap.String("input-file", inputFilename))
 
 		// Prepare output
-		framesFilename := viper.GetString(ArgFramesFile)
+		framesFilename := viper.GetString(common.ArgFramesFile)
 		logger.Info("saving frame info to file", zap.String("frames-file", framesFilename))
 
 		// Open output file, truncate if it already exists
@@ -49,11 +50,13 @@ var extractCmd = &cobra.Command{
 		writer := mediakit.NewParquetWriter[ffprobe.Frame](
 			outFile,
 			mediakit.WithCompression[ffprobe.Frame](new(snappy.Codec)),
+			mediakit.WithLogger[ffprobe.Frame](zapr.NewLogger(logger)),
+			mediakit.WithSchema[ffprobe.Frame](true),
 		)
 		defer writer.Close()
 
 		// Build the ffprobe command
-		builder := ffprobe.NewBuilder(ffprobe.New(), logger, inputFilename)
+		builder := ffprobe.NewCommandBuilder(ffprobe.New(), logger, inputFilename)
 		builder = builder.GetFramesCount().GetFrames()
 
 		if viper.GetBool(common.ArgThreads) {
@@ -123,11 +126,11 @@ var extractCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(extractCmd)
 
-	extractCmd.Flags().String(ArgFramesFile, "", "path to save frame information to")
+	extractCmd.Flags().String(common.ArgFramesFile, "", "path to save frame information to")
 	extractCmd.Flags().Bool(common.ArgLowPriority, false, "When set, runs subprocesses at a lower priority")
 	extractCmd.Flags().Duration(common.ArgStatsInterval, time.Minute, "Specifies the interval for printing out stats")
 	extractCmd.Flags().Bool(common.ArgThreads, false, "When set, set subprocess thread flags when appropriate")
-	extractCmd.MarkFlagRequired(ArgFramesFile)
+	extractCmd.MarkFlagRequired(common.ArgFramesFile)
 }
 
 func handleItems[T any](writer *mediakit.ParquetWriter[T], items <-chan T) error {
