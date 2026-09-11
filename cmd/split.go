@@ -1,19 +1,21 @@
 package cmd
 
 import (
-	"fmt"
-	mediakit "github.com/neptune-media/MediaKit-go"
-	"github.com/neptune-media/MediaKit-go/tasks"
-	"github.com/neptune-media/MediaKit-go/tools"
-	"github.com/neptune-media/MediaKit-go/tools/ffprobe"
-	"github.com/neptune-media/MediaKit-go/tools/mkvmerge"
-	"github.com/neptune-media/MediaKit-go/tools/mkvpropedit"
-	"log"
 	"os"
-	"strings"
+	"path/filepath"
 	"time"
 
+	"github.com/go-logr/zapr"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+
+	"github.com/neptune-media/MediaKit-go/cmd/common"
+	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
+	"github.com/neptune-media/MediaKit-go/pkg/mediakit/builders/episode"
+	"github.com/neptune-media/MediaKit-go/pkg/mediakit/utils"
+	"github.com/neptune-media/MediaKit-go/pkg/tools/ffprobe"
+	"github.com/neptune-media/MediaKit-go/pkg/tools/mkvmerge"
 )
 
 // splitCmd represents the split command
@@ -21,88 +23,115 @@ var splitCmd = &cobra.Command{
 	Use:   "split [file]",
 	Short: "Splits a multi-episode file into multiple files",
 	Args:  cobra.ExactArgs(1),
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := tools.NewChecks(
-			ffprobe.NewCheck(),
-			mkvmerge.NewCheck(),
-			mkvpropedit.NewCheck(),
-		).Run(); err != nil {
-			return fmt.Errorf("pre-flight checks failed: %v", err)
-		}
+	Run: func(cmd *cobra.Command, args []string) {
+		var err error
 
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
+		// Setup logging
+		logger := common.InitLogger()
+		defer logger.Sync()
+
+		// Get input
 		inputFilename := args[0]
-		fmt.Printf("source file: %s\n", inputFilename)
-		printCommands, err := cmd.Flags().GetBool("print")
-		if err != nil {
-			return fmt.Errorf("error while reading flag: %v", err)
+		logger = logger.With(zap.String("job", filepath.Base(inputFilename)))
+		logger.Info("using input file", zap.String("input-file", inputFilename))
+
+		// Get frame data
+		var frames ffprobe.FrameList = nil
+		if viper.GetBool(common.ArgAlignChapters) {
+			framesFilename := viper.GetString(common.ArgFramesFile)
+			logger.Info("using frames file", zap.String("frames-file", framesFilename))
+
+			frames, err = mediakit.ReadFramesFromFilename(framesFilename, zapr.NewLogger(logger), mediakit.FilterIFrames)
+			if err != nil {
+				logger.Fatal("failed to read frame data", zap.Error(err))
+			}
 		}
 
-		iframesFilename, err := cmd.Flags().GetString("iframes")
+		// Read chapters
+		logger.Info("reading chapters from file")
+		f, err := os.Open(inputFilename)
 		if err != nil {
-			return fmt.Errorf("error while reading flag: %v", err)
+			logger.Fatal("failed to open file", zap.Error(err))
+		}
+		defer f.Close()
+
+		chapters, err := utils.ReadVideoChapters(f, zapr.NewLogger(logger))
+		if err != nil {
+			logger.Fatal("failed to read chapters from file", zap.Error(err))
 		}
 
-		opts := newEpisodeBuilderOptionsFromFlags(cmd)
+		if frames != nil {
+			logger.Info("aligning chapters to I-frames")
+			seeker := episode.NewFrameSeeker(frames)
+			aligner := episode.Aligner{
+				Logger: zapr.NewLogger(logger),
+			}
 
-		var frames []time.Duration
-		frames, err = loadIFrames(inputFilename, iframesFilename)
-		if err != nil {
-			return fmt.Errorf("error while reading IFrames: %v", err)
+			chapters, err = aligner.AlignChaptersToIFrames(chapters, seeker)
+			if err != nil {
+				logger.Fatal("failed to align chapters to I-frames", zap.Error(err))
+			}
 		}
-		opts.FrameSeeker = &mediakit.FrameSeeker{Frames: frames}
 
-		// matroska-go outputs every block and is super noisy
-		log.SetOutput(new(Sink))
+		logger.Info("building episodes from chapters")
+		eob := episode.NewOptionsBuilder().
+			EndingChapterDuration(viper.GetDuration(common.ArgEndingChapterDuration)).
+			IgnoreMissingEnd(viper.GetBool(common.ArgIgnoreMissingEnd)).
+			MinimumChapters(viper.GetInt(common.ArgMinChapters)).
+			MinimumEpisodeDuration(viper.GetDuration(common.ArgMinEpisodeDuration)).
+			ShortChapterDuration(viper.GetDuration(common.ArgShortChapterDuration)).
+			ShortChapterMode(episode.ShortChapterMode(viper.GetString(common.ArgShortChapterMode)))
 
-		// Build episodes from file
-		fmt.Printf("Building episodes from file\n")
-		episodes, err := tasks.ReadVideoEpisodes(inputFilename, opts)
-		if err != nil {
-			return fmt.Errorf("error while reading episodes: %v", err)
-		}
-		fmt.Printf("Built %d episodes\n", len(episodes))
-
-		runner := mkvmerge.NewSplitter(
-			inputFilename,
-			"output.mkv",
-			episodes,
+		builder := episode.NewEpisodeBuilder(
+			episode.WithLogger(zapr.NewLogger(logger)),
+			episode.WithOptions(eob.Build()),
 		)
-		runner.LowPriority = true
-
-		if printCommands {
-			fmt.Fprintf(os.Stdout, "%s %s", runner.GetCommand(), strings.Join(runner.GetCommandArgs(), " "))
-		} else {
-			fmt.Printf("Splitting file into multiple episodes\n")
-			if err := runner.Do(); err != nil {
-				return fmt.Errorf("error while splitting file: %v\noutput from command:\n%s\n%s", err, runner.GetStdout(), runner.GetStderr())
-			}
-
-			fmt.Printf("Correcting episode chapter names\n")
-			if err := mkvpropedit.FixEpisodeChapterNames(episodes, "output.mkv"); err != nil {
-				return fmt.Errorf("error while writing chapters: %v", err)
-			}
+		episodes, err := builder.WithChapters(chapters).BuildAll()
+		if err != nil {
+			logger.Fatal("failed to build episodes", zap.Error(err))
 		}
 
-		return nil
+		splitterBuilder := mkvmerge.NewCommandBuilder(mkvmerge.New(), zapr.NewLogger(logger))
+		splitterBuilder = splitterBuilder.LowPriority().SplitEpisodes(episodes)
+		tool := splitterBuilder.Build(cmd.Context(), inputFilename, "split.mkv")
+
+		err = tool.Start()
+		if err != nil {
+			logger.Fatal("failed to start tool", zap.Error(err))
+		}
+
+		startTime := time.Now()
+		logger.Info("splitting episodes")
+
+		err = tool.Wait()
+		if err != nil {
+			// stdoutO, _ := io.ReadAll(stdout)
+			// stderrO, _ := io.ReadAll(stderr)
+			// if err != nil {
+			// 	logger.Fatal("error while reading stderr", zap.Error(err))
+			// }
+			// logger.Error("error while running tool", zap.String("stderr", string(stderrO)), zap.String("stdout", string(stdoutO)))
+			logger.Fatal("failed to run tool", zap.Error(err))
+		}
+		stopTime := time.Now()
+
+		duration := stopTime.Sub(startTime)
+		logger.Info("finished splitting episodes", zap.Duration("duration", duration))
+
+		// TODO: Finish this, but also, refactor this command and info/episodes, since
+		// they are basically the exact same, one just keeps going and the other stops.
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(splitCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// splitCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// splitCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	splitCmd.Flags().String("iframes", "", "Path to a file containing IFrame data for the video file")
-	splitCmd.Flags().BoolP("print", "", false, "Print mkvmerge commands instead of running")
-	addEpisodeBuilderFlags(splitCmd)
+	splitCmd.Flags().Bool(common.ArgAlignChapters, false, "Align chapters to I-Frames to reduce video corruption on split")
+	splitCmd.Flags().String(common.ArgFramesFile, "", "path to frame parquet file")
+	splitCmd.Flags().Duration(common.ArgEndingChapterDuration, time.Minute, "Chapters longer than this will continue the episode")
+	splitCmd.Flags().Bool(common.ArgIgnoreMissingEnd, false, "Ignore missing end of episodes")
+	splitCmd.Flags().Int(common.ArgMinChapters, 2, "Minimum number of chapters in an episode")
+	splitCmd.Flags().Duration(common.ArgMinEpisodeDuration, 20*time.Minute, "Minimum runtime of an episode")
+	splitCmd.Flags().Duration(common.ArgShortChapterDuration, 30*time.Second, "Defines max length of short chapters")
+	splitCmd.Flags().String(common.ArgShortChapterMode, "none", "How to handle short chapters (none, discard, include)")
 }

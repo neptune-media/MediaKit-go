@@ -56,18 +56,18 @@ var extractCmd = &cobra.Command{
 		defer writer.Close()
 
 		// Build the ffprobe command
-		builder := ffprobe.NewCommandBuilder(ffprobe.New(), logger, inputFilename)
+		builder := ffprobe.NewCommandBuilder(ffprobe.New(), logger)
 		builder = builder.GetFramesCount().GetFrames()
 
 		if viper.GetBool(common.ArgThreads) {
-			builder = builder.UseThreads(0)
+			builder = builder.Threads(0)
 		}
 
 		if viper.GetBool(common.ArgLowPriority) {
-			builder = builder.UseLowPriority()
+			builder = builder.LowPriority()
 		}
 
-		tool := builder.Build(cmd.Context())
+		tool := builder.Build(cmd.Context(), inputFilename)
 
 		// Get stdout for reader
 		stdout, err := tool.StdoutPipe()

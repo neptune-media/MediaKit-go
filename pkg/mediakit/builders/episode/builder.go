@@ -63,13 +63,34 @@ func (b *Builder) Build() (mediakit.Episode, error) {
 	start := b.chapterPos
 	episode := mediakit.Episode{
 		Chapters: make([]mediakit.Chapter, 0),
+		Discard:  true,
 	}
 
 	b.Logger.Info("building episode", "start-chapter", start)
 	for _, chapter := range b.chapters[start:len(b.chapters)] {
+		b.chapterPos++
+
+		// Check how we should handle short chapters
+		if chapter.Runtime() < b.Options.ShortChapterDuration {
+			switch b.Options.ShortChapterMode {
+			case ShortChapterModeNone:
+				// None is the default, normal handling.
+			case ShortChapterModeDiscard:
+				// Discard mode is used to end the episode, drop the short chapter, and
+				// start on the next.
+
+				// Return this episode, we're done now
+				return episode, nil
+
+			case ShortChapterModeInclude:
+				// Include mode is used to add the short chapter to the episode, and
+				// keep building without ending the episode.
+				continue
+			}
+		}
+
 		// Add next chapter to episode
 		episode.Chapters = append(episode.Chapters, chapter)
-		b.chapterPos++
 
 		// Keep adding chapters until we meet the minimum
 		if len(episode.Chapters) < b.Options.MinimumChapters {
@@ -81,9 +102,30 @@ func (b *Builder) Build() (mediakit.Episode, error) {
 			continue
 		}
 
+		// // Check if we should handle short chapters
+		// if b.Options.ShortChapterMode != ShortChapterModeNone && chapter.Runtime() < b.Options.ShortChapterDuration {
+		// 	switch b.Options.ShortChapterMode {
+		// 	case ShortChapterModeNone:
+		// 		// None is the default, normal handling.
+		// 	case ShortChapterModeDiscard:
+		// 		// Discard mode is used to end the episode, drop the short chapter, and
+		// 		// start on the next.
+		// 		episode.Discard = false
+		//
+		// 		// Return this episode, we're done now
+		// 		return episode, nil
+		//
+		// 	case ShortChapterModeInclude:
+		// 		// Include mode is used to add the short chapter to the episode, and
+		// 		// keep building without ending the episode.
+		// 		continue
+		// 	}
+		// }
+
 		// Discard the episode if the runtime doesn't meet the minimum length
-		if episode.Runtime() < b.Options.MinimumEpisodeDuration {
-			episode.Discard = true
+		// Keep episode once it exceeds the minimum length
+		if episode.Runtime() >= b.Options.MinimumEpisodeDuration {
+			episode.Discard = false
 		}
 
 		// At this point, we're done building this episode

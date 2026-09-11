@@ -3,8 +3,9 @@
 package tools
 
 import (
-	"golang.org/x/sys/unix"
 	"os"
+
+	"golang.org/x/sys/unix"
 )
 
 // ReduceProcessPriority is a multi-os helper for reducing

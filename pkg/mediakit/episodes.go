@@ -13,6 +13,14 @@ type Episode struct {
 
 type EpisodeList []Episode
 
+func (e Episode) EndTime() time.Duration {
+	if len(e.Chapters) == 0 {
+		return 0
+	}
+
+	return e.Chapters[len(e.Chapters)-1].EndTime()
+}
+
 func (e Episode) Runtime() time.Duration {
 	var r time.Duration
 	for _, c := range e.Chapters {
@@ -20,4 +28,12 @@ func (e Episode) Runtime() time.Duration {
 	}
 
 	return r
+}
+
+func (e Episode) StartTime() time.Duration {
+	if len(e.Chapters) == 0 {
+		return 0
+	}
+
+	return e.Chapters[0].StartTime()
 }

@@ -1,16 +1,24 @@
-//go:build !windows
-
 package tools
 
-import (
-	"os"
+import "os/exec"
 
-	"golang.org/x/sys/unix"
-)
+type PriorityCmd struct {
+	*exec.Cmd
+	LowPriority bool
+}
 
-// ReduceProcessPriority is a multi-os helper for reducing
-// the run priority of a process.
-func ReduceProcessPriority(p *os.Process) error {
-	// Priority 19 is the lowest priority
-	return unix.Setpriority(unix.PRIO_PROCESS, p.Pid, 19)
+func (c *PriorityCmd) Start() error {
+	err := c.Cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	if c.LowPriority {
+		err = ReduceProcessPriority(c.Cmd.Process)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

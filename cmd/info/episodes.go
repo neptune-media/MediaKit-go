@@ -49,7 +49,6 @@ var episodesCmd = &cobra.Command{
 
 		// Read chapters
 		logger.Info("reading chapters from file")
-
 		f, err := os.Open(inputFilename)
 		if err != nil {
 			logger.Fatal("failed to open file", zap.Error(err))
@@ -81,7 +80,9 @@ var episodesCmd = &cobra.Command{
 			EndingChapterDuration(viper.GetDuration(common.ArgEndingChapterDuration)).
 			IgnoreMissingEnd(viper.GetBool(common.ArgIgnoreMissingEnd)).
 			MinimumChapters(viper.GetInt(common.ArgMinChapters)).
-			MinimumEpisodeDuration(viper.GetDuration(common.ArgMinEpisodeDuration))
+			MinimumEpisodeDuration(viper.GetDuration(common.ArgMinEpisodeDuration)).
+			ShortChapterDuration(viper.GetDuration(common.ArgShortChapterDuration)).
+			ShortChapterMode(episode.ShortChapterMode(viper.GetString(common.ArgShortChapterMode)))
 
 		builder := episode.NewEpisodeBuilder(
 			episode.WithLogger(zapr.NewLogger(logger)),
@@ -120,4 +121,6 @@ func init() {
 	episodesCmd.Flags().Bool(common.ArgIgnoreMissingEnd, false, "Ignore missing end of episodes")
 	episodesCmd.Flags().Int(common.ArgMinChapters, 2, "Minimum number of chapters in an episode")
 	episodesCmd.Flags().Duration(common.ArgMinEpisodeDuration, 20*time.Minute, "Minimum runtime of an episode")
+	episodesCmd.Flags().Duration(common.ArgShortChapterDuration, 30*time.Second, "Defines max length of short chapters")
+	episodesCmd.Flags().String(common.ArgShortChapterMode, "none", "How to handle short chapters (none, discard, include)")
 }

@@ -16,6 +16,8 @@ const (
 	ArgIgnoreMissingEnd      = "ignore-missing-end"
 	ArgMinChapters           = "min-chapters"
 	ArgMinEpisodeDuration    = "min-episode-duration"
+	ArgShortChapterDuration  = "short-chapter-duration"
+	ArgShortChapterMode      = "short-chapter-mode"
 )
 
 // Frames flags

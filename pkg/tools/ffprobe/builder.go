@@ -12,50 +12,27 @@ import (
 )
 
 type CommandBuilder struct {
-	Filename string
-	Logger   *zap.Logger
-	Tool     *tools.Executable
+	Logger *zap.Logger
+	Tool   *tools.Executable
 
 	args        []string
 	lowPriority bool
 }
 
-type PriorityCmd struct {
-	*exec.Cmd
-	LowPriority bool
-}
-
-func (c *PriorityCmd) Start() error {
-	err := c.Cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	if c.LowPriority {
-		err = tools.ReduceProcessPriority(c.Cmd.Process)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func NewCommandBuilder(tool *tools.Executable, logger *zap.Logger, filename string) *CommandBuilder {
+func NewCommandBuilder(tool *tools.Executable, logger *zap.Logger) *CommandBuilder {
 	return &CommandBuilder{
-		Filename: filename,
-		Logger:   logger,
-		Tool:     tool,
-		args:     []string{"-of", "compact"},
+		Logger: logger,
+		Tool:   tool,
+		args:   []string{"-of", "compact"},
 	}
 }
 
-func (b *CommandBuilder) Build(ctx context.Context) *PriorityCmd {
+func (b *CommandBuilder) Build(ctx context.Context, filename string) *tools.PriorityCmd {
 	args := make([]string, len(b.args))
 	copy(args, b.args)
-	args = append(args, b.Filename)
+	args = append(args, filename)
 
-	cmd := &PriorityCmd{
+	cmd := &tools.PriorityCmd{
 		Cmd:         exec.CommandContext(ctx, b.Tool.Name, args...),
 		LowPriority: b.lowPriority,
 	}
@@ -74,12 +51,12 @@ func (b *CommandBuilder) GetFramesCount() *CommandBuilder {
 	return b
 }
 
-func (b *CommandBuilder) UseLowPriority() *CommandBuilder {
+func (b *CommandBuilder) LowPriority() *CommandBuilder {
 	b.lowPriority = true
 	return b
 }
 
-func (b *CommandBuilder) UseThreads(num int) *CommandBuilder {
+func (b *CommandBuilder) Threads(num int) *CommandBuilder {
 	b.args = append(b.args, "-threads", fmt.Sprintf("%d", num))
 	return b
 }
