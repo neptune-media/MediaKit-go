@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -78,6 +79,7 @@ var episodesCmd = &cobra.Command{
 		logger.Info("building episodes from chapters")
 		eob := episode.NewOptionsBuilder().
 			EndingChapterDuration(viper.GetDuration(common.ArgEndingChapterDuration)).
+			EndingChapterMode(episode.EndChapterMode(viper.GetString(common.ArgEndingChapterMode))).
 			IgnoreMissingEnd(viper.GetBool(common.ArgIgnoreMissingEnd)).
 			MinimumChapters(viper.GetInt(common.ArgMinChapters)).
 			MinimumEpisodeDuration(viper.GetDuration(common.ArgMinEpisodeDuration)).
@@ -97,12 +99,17 @@ var episodesCmd = &cobra.Command{
 		var totalEpisodeRuntime time.Duration
 		for idx, episode := range episodes {
 			totalEpisodeRuntime = totalEpisodeRuntime + episode.Runtime()
-			fmt.Printf("%02d\t%08d - %08d\t%20s\tdiscard=%t\n",
+			chapters := make([]string, len(episode.Chapters))
+			for i, c := range episode.Chapters {
+				chapters[i] = fmt.Sprintf("%d (%.01fs)", c.ID, c.Runtime().Seconds())
+			}
+			fmt.Printf("%02d\t%08d - %08d\t%20s\tdiscard=%t\tCh: %s\n",
 				idx+1,
 				episode.Chapters.First().TimeStart,
 				episode.Chapters.Last().TimeEnd,
 				episode.Runtime(),
-				episode.Discard)
+				episode.Discard,
+				strings.Join(chapters, " , "))
 		}
 
 		fmt.Println()
@@ -118,6 +125,7 @@ func init() {
 	episodesCmd.Flags().Bool(common.ArgAlignChapters, false, "Align chapters to I-Frames to reduce video corruption on split")
 	episodesCmd.Flags().String(common.ArgFramesFile, "", "path to frame parquet file")
 	episodesCmd.Flags().Duration(common.ArgEndingChapterDuration, time.Minute, "Chapters longer than this will continue the episode")
+	episodesCmd.Flags().String(common.ArgEndingChapterMode, "close", "What to do at the end of a chapter (close, peek)")
 	episodesCmd.Flags().Bool(common.ArgIgnoreMissingEnd, false, "Ignore missing end of episodes")
 	episodesCmd.Flags().Int(common.ArgMinChapters, 2, "Minimum number of chapters in an episode")
 	episodesCmd.Flags().Duration(common.ArgMinEpisodeDuration, 20*time.Minute, "Minimum runtime of an episode")

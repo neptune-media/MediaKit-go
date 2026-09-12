@@ -2,6 +2,13 @@ package episode
 
 import "time"
 
+type EndChapterMode string
+
+const (
+	EndChapterModeClose EndChapterMode = "close"
+	EndChapterModePeek  EndChapterMode = "peek"
+)
+
 type ShortChapterMode string
 
 const (
@@ -14,6 +21,9 @@ type Options struct {
 	// Length of chapter to consider as end of episode
 	// (chapters longer than this will continue the episode)
 	EndingChapterDuration time.Duration
+
+	// Sets ending chapter behavior
+	EndingChapterMode EndChapterMode
 
 	// Skips check on EndingChapterDuration
 	IgnoreMissingEnd bool
@@ -53,6 +63,10 @@ func (b *OptionsBuilder) Build() Options {
 	opts := new(Options)
 	*opts = *b.Options
 
+	if opts.EndingChapterMode == "" {
+		opts.EndingChapterMode = EndChapterModeClose
+	}
+
 	if opts.ShortChapterMode == "" {
 		opts.ShortChapterMode = ShortChapterModeNone
 	}
@@ -69,6 +83,12 @@ func (b *OptionsBuilder) Copy() *OptionsBuilder {
 func (b *OptionsBuilder) EndingChapterDuration(d time.Duration) *OptionsBuilder {
 	nb := b.Copy()
 	nb.Options.EndingChapterDuration = d
+	return nb
+}
+
+func (b *OptionsBuilder) EndingChapterMode(mode EndChapterMode) *OptionsBuilder {
+	nb := b.Copy()
+	nb.Options.EndingChapterMode = mode
 	return nb
 }
 

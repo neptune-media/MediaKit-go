@@ -63,73 +63,45 @@ func (b *Builder) Build() (mediakit.Episode, error) {
 	start := b.chapterPos
 	episode := mediakit.Episode{
 		Chapters: make([]mediakit.Chapter, 0),
-		Discard:  true,
 	}
+	b.Options.EndingChapterMode = EndChapterModePeek
 
 	b.Logger.Info("building episode", "start-chapter", start)
-	for _, chapter := range b.chapters[start:len(b.chapters)] {
+	for idx, chapter := range b.chapters[start:len(b.chapters)] {
+		input := FilterInput{
+			Chapter:       &chapter,
+			ChapterIndex:  start + idx,
+			Episode:       &episode,
+			Logger:        b.Logger.WithName("filter"),
+			Options:       b.Options,
+			TotalChapters: len(b.chapters),
+		}
 		b.chapterPos++
 
-		// Check how we should handle short chapters
-		if chapter.Runtime() < b.Options.ShortChapterDuration {
-			switch b.Options.ShortChapterMode {
-			case ShortChapterModeNone:
-				// None is the default, normal handling.
-			case ShortChapterModeDiscard:
-				// Discard mode is used to end the episode, drop the short chapter, and
-				// start on the next.
-
-				// Return this episode, we're done now
-				return episode, nil
-
-			case ShortChapterModeInclude:
-				// Include mode is used to add the short chapter to the episode, and
-				// keep building without ending the episode.
-				continue
-			}
+		if b.chapterPos < len(b.chapters) {
+			input.NextChapter = &b.chapters[b.chapterPos]
 		}
 
-		// Add next chapter to episode
-		episode.Chapters = append(episode.Chapters, chapter)
-
-		// Keep adding chapters until we meet the minimum
-		if len(episode.Chapters) < b.Options.MinimumChapters {
-			continue
+		filters := []BuilderFilter{
+			ShortChapterFilter(input.Options.ShortChapterMode, ShortChapterIncludeOptions{EpisodeSelector: EpisodeSelectorCurrent}),
+			MinimumChapterFilter,
+			// IgnoreMissingEndFilter,
+			MinimumEpisodeRuntimeFilter,
+			EndingChapterFilter,
 		}
 
-		// Keep adding chapters if the last chapter added is above the threshold
-		if !b.Options.IgnoreMissingEnd && chapter.Runtime() > b.Options.EndingChapterDuration {
-			continue
+		switch action := b.applyFilters(filters, input); action {
+		case ActionNone, ActionAppendChapter:
+			episode.Chapters = append(episode.Chapters, chapter)
+		case ActionCloseEpisode:
+			episode.Chapters = append(episode.Chapters, chapter)
+			return episode, nil
+		case ActionDiscardChapterAndClose:
+			return episode, nil
+		case ActionDiscardEpisode:
+			episode.Discard = true
+			return episode, nil
 		}
-
-		// // Check if we should handle short chapters
-		// if b.Options.ShortChapterMode != ShortChapterModeNone && chapter.Runtime() < b.Options.ShortChapterDuration {
-		// 	switch b.Options.ShortChapterMode {
-		// 	case ShortChapterModeNone:
-		// 		// None is the default, normal handling.
-		// 	case ShortChapterModeDiscard:
-		// 		// Discard mode is used to end the episode, drop the short chapter, and
-		// 		// start on the next.
-		// 		episode.Discard = false
-		//
-		// 		// Return this episode, we're done now
-		// 		return episode, nil
-		//
-		// 	case ShortChapterModeInclude:
-		// 		// Include mode is used to add the short chapter to the episode, and
-		// 		// keep building without ending the episode.
-		// 		continue
-		// 	}
-		// }
-
-		// Discard the episode if the runtime doesn't meet the minimum length
-		// Keep episode once it exceeds the minimum length
-		if episode.Runtime() >= b.Options.MinimumEpisodeDuration {
-			episode.Discard = false
-		}
-
-		// At this point, we're done building this episode
-		return episode, nil
 	}
 
 	return episode, io.EOF
@@ -153,4 +125,17 @@ func (b *Builder) BuildAll() (mediakit.EpisodeList, error) {
 	}
 
 	return episodes, nil
+}
+
+func (b *Builder) applyFilters(filters []BuilderFilter, input FilterInput) FilterAction {
+	for _, filter := range filters {
+		switch action := filter(input); action {
+		case ActionNone:
+			continue
+		default:
+			return action
+		}
+	}
+
+	return ActionNone
 }

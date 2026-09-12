@@ -13,10 +13,12 @@ const (
 const (
 	ArgAlignChapters         = "align-chapters"
 	ArgEndingChapterDuration = "ending-chapter-duration"
+	ArgEndingChapterMode     = "ending-chapter-mode"
 	ArgIgnoreMissingEnd      = "ignore-missing-end"
 	ArgMinChapters           = "min-chapters"
 	ArgMinEpisodeDuration    = "min-episode-duration"
 	ArgShortChapterDuration  = "short-chapter-duration"
+	ArgShortChapterEpisode   = "short-chapter-episode"
 	ArgShortChapterMode      = "short-chapter-mode"
 )
 
