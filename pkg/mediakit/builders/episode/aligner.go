@@ -60,7 +60,7 @@ func (a *Aligner) AlignChaptersToIFrames(chapters mediakit.ChapterList, seeker F
 
 func (a *Aligner) alignChapter(chapter mediakit.Chapter, seeker FrameSeeker) (mediakit.Chapter, error) {
 	// Seek until the next frame is after the chapter start time
-	for seeker.Current(); seeker.Peek() < chapter.StartTime(); seeker.Next() {
+	for seeker.Current(); seeker.Current() < chapter.StartTime(); seeker.Next() {
 		// Stop seeking if we're at the end
 		if seeker.EOF() {
 			return mediakit.Chapter{}, io.EOF
