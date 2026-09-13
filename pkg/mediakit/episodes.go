@@ -37,3 +37,16 @@ func (e Episode) StartTime() time.Duration {
 
 	return e.Chapters[0].StartTime()
 }
+
+func (l EpisodeList) Runtime() time.Duration {
+	var runtime time.Duration
+	if l == nil {
+		return 0
+	}
+
+	for _, episode := range l {
+		runtime += episode.Runtime()
+	}
+
+	return runtime
+}

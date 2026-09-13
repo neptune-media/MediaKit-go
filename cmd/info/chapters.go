@@ -2,15 +2,12 @@ package info
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/go-logr/zapr"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/neptune-media/MediaKit-go/cmd/common"
-	"github.com/neptune-media/MediaKit-go/pkg/mediakit/utils"
 )
 
 // chaptersCmd represents the chapters command
@@ -24,17 +21,9 @@ var chaptersCmd = &cobra.Command{
 		defer logger.Sync()
 
 		// Get input
-		inputFilename := args[0]
-		logger = logger.With(zap.String("job", filepath.Base(inputFilename)))
-		logger.Info("using input file", zap.String("input-file", inputFilename))
-
-		f, err := os.Open(inputFilename)
-		if err != nil {
-			logger.Fatal("failed to open file", zap.Error(err))
-		}
-		defer f.Close()
-
-		chapters, err := utils.ReadVideoChapters(f, zapr.NewLogger(logger))
+		filename := args[0]
+		logger = logger.With(zap.String("job", filepath.Base(filename)))
+		chapters, err := common.GetVideoChapters(logger, filename)
 		if err != nil {
 			logger.Fatal("failed to parse file", zap.Error(err))
 		}

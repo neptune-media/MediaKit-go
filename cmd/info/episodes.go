@@ -2,21 +2,14 @@ package info
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/go-logr/zapr"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	"github.com/neptune-media/MediaKit-go/cmd/common"
-	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
-	"github.com/neptune-media/MediaKit-go/pkg/mediakit/builders/episode"
-	"github.com/neptune-media/MediaKit-go/pkg/mediakit/utils"
-	"github.com/neptune-media/MediaKit-go/pkg/tools/ffprobe"
 )
 
 // episodesCmd represents the episodes command
@@ -32,73 +25,15 @@ var episodesCmd = &cobra.Command{
 		defer logger.Sync()
 
 		// Get input
-		inputFilename := args[0]
-		logger = logger.With(zap.String("job", filepath.Base(inputFilename)))
-		logger.Info("using input file", zap.String("input-file", inputFilename))
-
-		// Get frame data
-		var frames ffprobe.FrameList = nil
-		if viper.GetBool(common.ArgAlignChapters) {
-			framesFilename := viper.GetString(common.ArgFramesFile)
-			logger.Info("using frames file", zap.String("frames-file", framesFilename))
-
-			frames, err = mediakit.ReadFramesFromFilename(framesFilename, zapr.NewLogger(logger), mediakit.FilterIFrames)
-			if err != nil {
-				logger.Fatal("failed to read frame data", zap.Error(err))
-			}
-		}
-
-		// Read chapters
-		logger.Info("reading chapters from file")
-		f, err := os.Open(inputFilename)
-		if err != nil {
-			logger.Fatal("failed to open file", zap.Error(err))
-		}
-		defer f.Close()
-
-		chapters, err := utils.ReadVideoChapters(f, zapr.NewLogger(logger))
-		if err != nil {
-			logger.Fatal("failed to read chapters from file", zap.Error(err))
-		}
-
-		if frames != nil {
-			logger.Info("aligning chapters to I-frames")
-			seeker := episode.NewFrameSeeker(frames)
-			aligner := episode.Aligner{
-				Logger: zapr.NewLogger(logger),
-			}
-
-			chapters, err = aligner.AlignChaptersToIFrames(chapters, seeker)
-			if err != nil {
-				logger.Fatal("failed to align chapters to I-frames", zap.Error(err))
-			}
-		}
-
-		totalChapterRuntime := chapters.Runtime()
-
-		logger.Info("building episodes from chapters")
-		eob := episode.NewOptionsBuilder().
-			EndingChapterDuration(viper.GetDuration(common.ArgEndingChapterDuration)).
-			EndingChapterMode(episode.EndChapterMode(viper.GetString(common.ArgEndingChapterMode))).
-			IgnoreMissingEnd(viper.GetBool(common.ArgIgnoreMissingEnd)).
-			MinimumChapters(viper.GetInt(common.ArgMinChapters)).
-			MinimumEpisodeDuration(viper.GetDuration(common.ArgMinEpisodeDuration)).
-			ShortChapterDuration(viper.GetDuration(common.ArgShortChapterDuration)).
-			ShortChapterMode(episode.ShortChapterMode(viper.GetString(common.ArgShortChapterMode)))
-
-		builder := episode.NewEpisodeBuilder(
-			episode.WithLogger(zapr.NewLogger(logger)),
-			episode.WithOptions(eob.Build()),
-		)
-		episodes, err := builder.WithChapters(chapters).BuildAll()
+		filename := args[0]
+		logger = logger.With(zap.String("job", filepath.Base(filename)))
+		episodes, err := common.BuildEpisodes(logger, filename)
 		if err != nil {
 			logger.Fatal("failed to build episodes", zap.Error(err))
 		}
 
 		logger.Info("dumping episodes")
-		var totalEpisodeRuntime time.Duration
 		for idx, episode := range episodes {
-			totalEpisodeRuntime = totalEpisodeRuntime + episode.Runtime()
 			chapters := make([]string, len(episode.Chapters))
 			for i, c := range episode.Chapters {
 				chapters[i] = fmt.Sprintf("%d (%.01fs)", c.ID, c.Runtime().Seconds())
@@ -111,11 +46,6 @@ var episodesCmd = &cobra.Command{
 				episode.Discard,
 				strings.Join(chapters, " , "))
 		}
-
-		fmt.Println()
-		fmt.Printf("pre-split run time: %20s\n", totalChapterRuntime)
-		fmt.Printf("post-split run time: %20s\n", totalEpisodeRuntime)
-		fmt.Println()
 	},
 }
 
