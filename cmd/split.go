@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/neptune-media/MediaKit-go/pkg/mediakit/utils"
 	"github.com/neptune-media/MediaKit-go/pkg/tools/ffprobe"
 	"github.com/neptune-media/MediaKit-go/pkg/tools/mkvmerge"
+	"github.com/neptune-media/MediaKit-go/pkg/tools/mkvpropedit"
 )
 
 // splitCmd represents the split command
@@ -105,18 +109,43 @@ var splitCmd = &cobra.Command{
 
 		err = tool.Wait()
 		if err != nil {
-			// stdoutO, _ := io.ReadAll(stdout)
-			// stderrO, _ := io.ReadAll(stderr)
-			// if err != nil {
-			// 	logger.Fatal("error while reading stderr", zap.Error(err))
-			// }
-			// logger.Error("error while running tool", zap.String("stderr", string(stderrO)), zap.String("stdout", string(stdoutO)))
 			logger.Fatal("failed to run tool", zap.Error(err))
 		}
 		stopTime := time.Now()
 
 		duration := stopTime.Sub(startTime)
 		logger.Info("finished splitting episodes", zap.Duration("duration", duration))
+
+		startTime = time.Now()
+		logger.Info("fixing chapter names")
+		propeditBuilder := mkvpropedit.NewCommandBuilder(mkvpropedit.New(), zapr.NewLogger(logger))
+		for idx, episode := range episodes {
+			filename := mkvmerge.FormatSplitOutputName("split.mkv", idx)
+			chFilename := fmt.Sprintf("%s.chapters", filename)
+			tool := propeditBuilder.RenameChapters(chFilename).Build(cmd.Context(), filename)
+
+			err = mediakit.WriteChapterNamesToFile(episode.Chapters, chFilename)
+			if err != nil {
+				logger.Fatal("failed to write chapter names", zap.Error(err))
+			}
+
+			err = tool.Start()
+			if err != nil {
+				logger.Fatal("failed to start tool", zap.Error(err))
+			}
+			err = tool.Wait()
+			if err != nil {
+				var toolErr *exec.ExitError
+				if errors.As(err, &toolErr) {
+					logger.Info("tool output", zap.String("stderr", string(toolErr.Stderr)))
+				}
+				logger.Fatal("failed to run tool", zap.Error(err))
+			}
+		}
+
+		stopTime = time.Now()
+		duration = stopTime.Sub(startTime)
+		logger.Info("finished fixing chapter names", zap.Duration("duration", duration))
 
 		// TODO: Finish this, but also, refactor this command and info/episodes, since
 		// they are basically the exact same, one just keeps going and the other stops.

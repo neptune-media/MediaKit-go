@@ -1,7 +1,12 @@
 package mediakit
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"time"
+
+	"github.com/neptune-media/MediaKit-go/pkg/ogmtools"
 )
 
 // Chapter represents a chapter within a video file
@@ -77,4 +82,42 @@ func (l ChapterList) Runtime() time.Duration {
 	}
 
 	return runtime
+}
+
+func (l ChapterList) WriteTo(w io.Writer) (int64, error) {
+	var n int64 = 0
+	offset := l.First().StartTime()
+	for i, chapter := range l {
+		// Offset chapter start time by first chapter to get relative start time
+		startTime := chapter.StartTime() - offset
+
+		// Write chapter timecode
+		count, err := fmt.Fprintln(w, ogmtools.ChapterTimeString(i, startTime))
+		n += int64(count)
+		if err != nil {
+			return n, err
+		}
+
+		// Write chapter name
+		count, err = fmt.Fprintln(w, ogmtools.ChapterNameString(i))
+		n += int64(count)
+		if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
+}
+
+func WriteChapterNamesToFile(chapters ChapterList, filename string) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := chapters.WriteTo(f); err != nil {
+		return err
+	}
+
+	return nil
 }

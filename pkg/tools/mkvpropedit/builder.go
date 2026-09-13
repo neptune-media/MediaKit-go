@@ -2,13 +2,11 @@ package mkvpropedit
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 
 	"github.com/go-logr/logr"
 
-	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
 	"github.com/neptune-media/MediaKit-go/pkg/tools"
 )
 
@@ -29,12 +27,13 @@ func NewCommandBuilder(tool *tools.Executable, logger logr.Logger) *CommandBuild
 }
 
 func (b *CommandBuilder) Build(ctx context.Context, inputFilename string) *tools.PriorityCmd {
-	args := make([]string, 1, len(b.args)+1)
+	args := make([]string, len(b.args)+1)
 	args[0] = inputFilename
 	copy(args[1:], b.args)
 
 	cmd := &tools.PriorityCmd{
 		Cmd:         exec.CommandContext(ctx, b.Tool.Name, args...),
+		Logger:      b.Logger,
 		LowPriority: b.lowPriority,
 	}
 
@@ -45,12 +44,6 @@ func (b *CommandBuilder) Build(ctx context.Context, inputFilename string) *tools
 		"command", strings.Join(append([]string{cmd.Path}, args...), " "),
 	)
 	return cmd
-}
-
-func (b *CommandBuilder) RenameChapters(filename string) *CommandBuilder {
-	nb := b.Copy()
-	nb.args = append(nb.args, "-c", filename)
-	return nb
 }
 
 func (b *CommandBuilder) Copy() *CommandBuilder {
@@ -67,22 +60,28 @@ func (b *CommandBuilder) LowPriority() *CommandBuilder {
 	return nb
 }
 
-func (b *CommandBuilder) SplitEpisodes(episodes mediakit.EpisodeList) *CommandBuilder {
-	partList := make([]string, len(episodes))
-	for i, episode := range episodes {
-		partList[i] = fmt.Sprintf(
-			"%dms-%dms",
-			episode.StartTime().Milliseconds(),
-			episode.EndTime().Milliseconds(),
-		)
-	}
-
-	return b.SplitInput(partList)
-}
-
-func (b *CommandBuilder) SplitInput(parts []string) *CommandBuilder {
+func (b *CommandBuilder) RenameChapters(filename string) *CommandBuilder {
 	nb := b.Copy()
-	partsStr := strings.Join(parts, ",")
-	nb.args = append(nb.args, "--split", fmt.Sprintf("parts:%s", partsStr))
+	nb.args = append(nb.args, "-c", filename)
 	return nb
 }
+
+// func (b *CommandBuilder) SplitEpisodes(episodes mediakit.EpisodeList) *CommandBuilder {
+// 	partList := make([]string, len(episodes))
+// 	for i, episode := range episodes {
+// 		partList[i] = fmt.Sprintf(
+// 			"%dms-%dms",
+// 			episode.StartTime().Milliseconds(),
+// 			episode.EndTime().Milliseconds(),
+// 		)
+// 	}
+//
+// 	return b.SplitInput(partList)
+// }
+//
+// func (b *CommandBuilder) SplitInput(parts []string) *CommandBuilder {
+// 	nb := b.Copy()
+// 	partsStr := strings.Join(parts, ",")
+// 	nb.args = append(nb.args, "--split", fmt.Sprintf("parts:%s", partsStr))
+// 	return nb
+// }
