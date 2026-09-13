@@ -107,19 +107,13 @@ var extractCmd = &cobra.Command{
 
 		err = tool.Wait()
 		if err != nil {
-			// stdoutO, _ := io.ReadAll(stdout)
-			// stderrO, _ := io.ReadAll(stderr)
-			// if err != nil {
-			// 	logger.Fatal("error while reading stderr", zap.Error(err))
-			// }
-			// logger.Error("error while running tool", zap.String("stderr", string(stderrO)), zap.String("stdout", string(stdoutO)))
 			logger.Fatal("failed to run tool", zap.Error(err))
 		}
 		stopTime := time.Now()
 
 		statsCancelFn()
 		duration := stopTime.Sub(startTime)
-		logger.Info("finished dumping iframes", zap.Duration("duration", duration))
+		logger.Info("finished dumping frames", zap.Duration("duration", duration))
 	},
 }
 
