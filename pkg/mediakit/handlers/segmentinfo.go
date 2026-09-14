@@ -36,7 +36,6 @@ func (h *SegmentInfoHandler) HandleMasterBegin(id mkvparse.ElementID, info mkvpa
 		return true, nil
 	default:
 		return false, nil
-		// return h.DefaultHandler.HandleMasterBegin(id, info)
 	}
 }
 

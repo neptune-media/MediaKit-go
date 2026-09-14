@@ -41,7 +41,6 @@ func (h *ChapterHandler) HandleMasterBegin(id mkvparse.ElementID, info mkvparse.
 		return true, nil
 	default:
 		return false, nil
-		// 	return h.DefaultHandler.HandleMasterBegin(id, info)
 	}
 }
 

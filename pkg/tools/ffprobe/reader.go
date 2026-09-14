@@ -150,38 +150,6 @@ func decodeParsedLine[T any](parsed parsedLine) (T, error) {
 	return t, decoder.Decode(parsed.Parts)
 }
 
-// func decodeFrame(parsed parsedLine) (Frame, error) {
-// 	var frame Frame
-//
-// 	cfg := &mapstructure.DecoderConfig{
-// 		Result:           &frame,
-// 		WeaklyTypedInput: true,
-// 	}
-//
-// 	decoder, err := mapstructure.NewDecoder(cfg)
-// 	if err != nil {
-// 		return frame, err
-// 	}
-//
-// 	return frame, decoder.Decode(parsed.Parts)
-// }
-//
-// func decodeStream(parsed parsedLine) (Stream, error) {
-// 	var stream Stream
-//
-// 	cfg := &mapstructure.DecoderConfig{
-// 		Result:           &stream,
-// 		WeaklyTypedInput: true,
-// 	}
-//
-// 	decoder, err := mapstructure.NewDecoder(cfg)
-// 	if err != nil {
-// 		return stream, err
-// 	}
-//
-// 	return stream, decoder.Decode(parsed.Parts)
-// }
-
 func parseLine(line string) parsedLine {
 	raw := parsedLine{
 		Parts: make(map[string]string),

@@ -83,23 +83,3 @@ func (g *Gauge) Value() float64 {
 	defer g.lock.Unlock()
 	return g.value
 }
-
-//
-// type FFProbe struct {
-// 	// Number of lines parsed into frames
-// 	DecodedFrames *Counter
-//
-// 	// Number of lines parsed
-// 	ParsedLines *Counter
-//
-// 	// Number of lines read
-// 	ReadLines *Counter
-// }
-//
-// func NewFFProbe() *FFProbe {
-// 	return &FFProbe{
-// 		DecodedFrames: new(Counter),
-// 		ParsedLines:   new(Counter),
-// 		ReadLines:     new(Counter),
-// 	}
-// }

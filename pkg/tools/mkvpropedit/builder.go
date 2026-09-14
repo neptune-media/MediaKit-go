@@ -65,23 +65,3 @@ func (b *CommandBuilder) RenameChapters(filename string) *CommandBuilder {
 	nb.args = append(nb.args, "-c", filename)
 	return nb
 }
-
-// func (b *CommandBuilder) SplitEpisodes(episodes mediakit.EpisodeList) *CommandBuilder {
-// 	partList := make([]string, len(episodes))
-// 	for i, episode := range episodes {
-// 		partList[i] = fmt.Sprintf(
-// 			"%dms-%dms",
-// 			episode.StartTime().Milliseconds(),
-// 			episode.EndTime().Milliseconds(),
-// 		)
-// 	}
-//
-// 	return b.SplitInput(partList)
-// }
-//
-// func (b *CommandBuilder) SplitInput(parts []string) *CommandBuilder {
-// 	nb := b.Copy()
-// 	partsStr := strings.Join(parts, ",")
-// 	nb.args = append(nb.args, "--split", fmt.Sprintf("parts:%s", partsStr))
-// 	return nb
-// }
