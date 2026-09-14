@@ -1,0 +1,173 @@
+package cmd
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/go-logr/zapr"
+	"github.com/parquet-go/parquet-go/compress/snappy"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+
+	"github.com/neptune-media/MediaKit-go/cmd/common"
+	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
+	"github.com/neptune-media/MediaKit-go/pkg/tools/ffprobe"
+)
+
+// extractCmd represents the frames command
+var extractCmd = &cobra.Command{
+	Use:   "extract [file]",
+	Short: "Extracts a list of frames and streams from the given file to parquet",
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		tool := ffprobe.New()
+		return tool.Validate(cmd.Context())
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		// Setup logging
+		logger := common.InitLogger()
+		defer logger.Sync()
+
+		// Get input
+		inputFilename := args[0]
+		logger = logger.With(zap.String("job", filepath.Base(inputFilename)))
+		logger.Info("using input file", zap.String("input-file", inputFilename))
+
+		// Prepare output
+		framesFilename := viper.GetString(common.ArgFramesFile)
+		logger.Info("saving frame info to file", zap.String("frames-file", framesFilename))
+
+		// Open output file, truncate if it already exists
+		outFile, err := os.Create(framesFilename)
+		if err != nil {
+			logger.Fatal("failed to create output file", zap.Error(err))
+		}
+		defer outFile.Close()
+
+		// Create the writer
+		writer := mediakit.NewParquetWriter[ffprobe.Frame](
+			outFile,
+			mediakit.WithCompression[ffprobe.Frame](new(snappy.Codec)),
+			mediakit.WithLogger[ffprobe.Frame](zapr.NewLogger(logger)),
+			mediakit.WithSchema[ffprobe.Frame](true),
+		)
+		defer writer.Close()
+
+		// Build the ffprobe command
+		builder := ffprobe.NewCommandBuilder(ffprobe.New(), logger)
+		builder = builder.GetFramesCount().GetFrames()
+
+		if viper.GetBool(common.ArgThreads) {
+			builder = builder.Threads(0)
+		}
+
+		if viper.GetBool(common.ArgLowPriority) {
+			builder = builder.LowPriority()
+		}
+
+		tool := builder.Build(cmd.Context(), inputFilename)
+
+		// Get stdout for reader
+		stdout, err := tool.StdoutPipe()
+		if err != nil {
+			logger.Fatal("failed to get stdout pipe", zap.Error(err))
+		}
+		defer stdout.Close()
+
+		// Start ffprobe
+		err = tool.Start()
+		if err != nil {
+			logger.Fatal("failed to start tool", zap.Error(err))
+		}
+
+		startTime := time.Now()
+		logger.Info("dumping frames")
+
+		// Start ffprobe reader
+		frameReader := ffprobe.NewReader()
+		frames := frameReader.Frames()
+		go func(r *ffprobe.Reader) {
+			err := r.Start(cmd.Context(), stdout)
+			if err != nil {
+				logger.Fatal("failed to read frame", zap.Error(err))
+			}
+			defer r.Close()
+		}(frameReader)
+
+		// Stats printer
+		statsCancelFn := newStatsPrinter(cmd.Context(), logger, viper.GetDuration(common.ArgStatsInterval), frameReader)
+
+		// Process items from reader
+		err = handleItems(writer, frames)
+		if err != nil {
+			logger.Fatal("failed to write frames", zap.Error(err))
+		}
+
+		err = tool.Wait()
+		if err != nil {
+			logger.Fatal("failed to run tool", zap.Error(err))
+		}
+		stopTime := time.Now()
+
+		statsCancelFn()
+		duration := stopTime.Sub(startTime)
+		logger.Info("finished dumping frames", zap.Duration("duration", duration))
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(extractCmd)
+
+	extractCmd.Flags().String(common.ArgFramesFile, "", "path to save frame information to")
+	extractCmd.Flags().Bool(common.ArgLowPriority, false, "When set, runs subprocesses at a lower priority")
+	extractCmd.Flags().Duration(common.ArgStatsInterval, time.Minute, "Specifies the interval for printing out stats")
+	extractCmd.Flags().Bool(common.ArgThreads, false, "When set, set subprocess thread flags when appropriate")
+	extractCmd.MarkFlagRequired(common.ArgFramesFile)
+}
+
+func handleItems[T any](writer *mediakit.ParquetWriter[T], items <-chan T) error {
+	var err error
+
+	for {
+		select {
+		case item, ok := <-items:
+			if !ok {
+				return nil
+			}
+
+			_, err = writer.Write([]T{item})
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func newStatsPrinter(ctx context.Context, logger *zap.Logger, interval time.Duration, reader *ffprobe.Reader) context.CancelFunc {
+	ctx, cancelFn := context.WithCancel(ctx)
+
+	f := func() {
+		ticker := time.NewTicker(interval)
+		lastStats := ffprobe.ReaderStats{
+			Time: time.Now(),
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case t := <-ticker.C:
+				stats := reader.Stats()
+				deltaFrames := stats.DecodedFrames - lastStats.DecodedFrames
+				rate := float64(deltaFrames) / t.Sub(lastStats.Time).Seconds()
+				lastStats = stats
+				logger.Info("read progress", zap.Uint("decoded-frames", uint(stats.DecodedFrames)), zap.Uint("decoded-streams", uint(stats.DecodedStreams)), zap.Uint("fps", uint(rate)))
+			}
+		}
+	}
+
+	go f()
+	return cancelFn
+}

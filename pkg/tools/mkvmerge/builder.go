@@ -1,0 +1,97 @@
+package mkvmerge
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"strings"
+
+	"github.com/go-logr/logr"
+
+	"github.com/neptune-media/MediaKit-go/pkg/mediakit"
+	"github.com/neptune-media/MediaKit-go/pkg/tools"
+)
+
+type CommandBuilder struct {
+	Logger logr.Logger
+	Tool   *tools.Executable
+
+	args        []string
+	lowPriority bool
+}
+
+func NewCommandBuilder(tool *tools.Executable, logger logr.Logger) *CommandBuilder {
+	return &CommandBuilder{
+		Logger: logger,
+		Tool:   tool,
+		args:   make([]string, 0),
+	}
+}
+
+func (b *CommandBuilder) Build(ctx context.Context, inputFilename, outputFilename string) *tools.PriorityCmd {
+	args := make([]string, 0)
+
+	if outputFilename != "" {
+		args = append(args, "-o", outputFilename)
+	}
+
+	if len(b.args) > 0 {
+		args = append(args, b.args...)
+	}
+
+	if inputFilename != "" {
+		args = append(args, inputFilename)
+	}
+
+	cmd := &tools.PriorityCmd{
+		Cmd:         exec.CommandContext(ctx, b.Tool.Name, args...),
+		LowPriority: b.lowPriority,
+	}
+
+	b.Logger.V(1).Info(
+		"built command",
+		"path", cmd.Path,
+		"args", cmd.Args,
+		"command", strings.Join(append([]string{cmd.Path}, args...), " "),
+	)
+	return cmd
+}
+
+func (b *CommandBuilder) Copy() *CommandBuilder {
+	nb := &CommandBuilder{}
+	*nb = *b
+	nb.args = make([]string, len(b.args))
+	copy(nb.args, b.args)
+	return nb
+}
+
+func (b *CommandBuilder) LowPriority() *CommandBuilder {
+	nb := b.Copy()
+	nb.lowPriority = true
+	return nb
+}
+
+func (b *CommandBuilder) SplitEpisodes(episodes mediakit.EpisodeList) *CommandBuilder {
+	partList := make([]string, len(episodes))
+	for i, episode := range episodes {
+		// Skip discarded episodes
+		if episode.Discard {
+			continue
+		}
+
+		partList[i] = fmt.Sprintf(
+			"%dms-%dms",
+			episode.StartTime().Milliseconds(),
+			episode.EndTime().Milliseconds(),
+		)
+	}
+
+	return b.SplitInput(partList)
+}
+
+func (b *CommandBuilder) SplitInput(parts []string) *CommandBuilder {
+	nb := b.Copy()
+	partsStr := strings.Join(parts, ",")
+	nb.args = append(nb.args, "--split", fmt.Sprintf("parts:%s", partsStr))
+	return nb
+}
